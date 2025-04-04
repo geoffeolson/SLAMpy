@@ -10,7 +10,8 @@ def move(distribution, delta):
 
     # --->>> Insert your code here.
     
-    return distribution  # Replace this by your own result.
+    #return distribution  # Replace this by your own result.
+    return Distribution(distribution.offset + delta, distribution.values)
 
 if __name__ == '__main__':
     # List of movements: move 3 times by 20.
@@ -18,13 +19,12 @@ if __name__ == '__main__':
 
     # Start with a known position: probability 1.0 at position 10.
     position = Distribution.triangle(10,2)
-    plot(position.plotlists(0,100)[0], position.plotlists(0,100)[1],
-         linestyle='steps')
+    plot(position.plotlists(0,100)[0], position.plotlists(0,100)[1], linestyle='-')
 
     # Now move and plot.
     for m in moves:
         position = move(position, m)
-        plot(position.plotlists(0,100)[0], position.plotlists(0,100)[1],
-             linestyle='steps')
+        a = position.plotlists(0,100)
+        plot(position.plotlists(0,100)[0], position.plotlists(0,100)[1], linestyle='-')
     ylim(0.0, 1.1)
     show()

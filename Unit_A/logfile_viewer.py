@@ -1,9 +1,12 @@
 # Python routines to inspect a ikg LEGO robot logfile.
 # Author: Claus Brenner, 28.10.2012
-from Tkinter import *
-import tkFileDialog
+from tkinter import *
+#import tkFileDialog
+from tkinter import filedialog
 from lego_robot import *
 from math import sin, cos, pi
+import os
+os.chdir("Unit_A")
 
 # The canvas and world extents of the scene.
 # Canvas extents in pixels, world extents in millimeters.
@@ -19,10 +22,10 @@ max_scanner_range = 2200.0
 
 class DrawableObject(object):
     def draw(self, at_step):
-        print "To be overwritten - will draw a certain point in time:", at_step
+        print( "To be overwritten - will draw a certain point in time:", at_step)
 
     def background_draw(self):
-        print "Background draw."
+        print( "Background draw.")
 
 class Trajectory(DrawableObject):
     def __init__(self, points, canvas,
@@ -184,7 +187,7 @@ def slider_moved(index):
     info.config(text=logfile.info(i))
 
 def add_file():
-    filename = tkFileDialog.askopenfilename(filetypes = [("all files", ".*"), ("txt files", ".txt")])
+    filename = filedialog.askopenfilename(filetypes = [("all files", ".*"), ("txt files", ".txt")])
     if filename and filename not in all_file_names:
         all_file_names.append(filename)
         load_data()

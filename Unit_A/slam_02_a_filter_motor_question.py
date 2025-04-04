@@ -7,31 +7,41 @@ from math import sin,cos,pi
 
 # This function takes the old (x, y, heading) pose and the motor ticks
 # (ticks_left, ticks_right) and returns the new (x, y, heading).
-def filter_step(old_pose, motor_ticks, ticks_to_mm, robot_width):
-    x, y, theta = old_pose
-    l, r = motor_ticks
-    l = l * ticks_to_mm
-    r = r * ticks_to_mm
-    alpha = (r - l) / robot_width
+def filter_step(old_pose, motor_ticks, mm_per_tick, robot_width):
+    x, y, heading = old_pose
+    left, right = motor_ticks
+    left = left * mm_per_tick
+    right = right * mm_per_tick
+    heading_change = (right - left) / robot_width
 
-    if alpha == 0: # was there is a turn?
-        # No turn. Just drive straight.
-        x = x + l * cos(theta)
-        y = y + l * sin(theta)
-        ad = 4
+    if heading_change == 0:
+        # The Robot did not Turn. It just drove straight.
+        x = x + left * cos(heading)
+        y = y + left * sin(heading)
+        ##############################################################
+        # Think about if you need to modify your old code due to the
+        # scanner displacement?
+        #################################################################
 
     else:
-        # turned
-        R = l / alpha
-        Rc = R + robot_width / 2.0
-        cx = x - Rc * sin(theta)
-        cy = y + Rc * cos(theta)
-        theta = (theta + alpha) % (2 * pi)
-        x = cx + Rc * sin(theta)
-        y = cy - Rc * cos(theta)
-        ass=45
+        # The Robot Turned
+        radius = left / heading_change + robot_width / 2.
+        center_x = x - radius * sin(heading)
+        center_y = y + radius * cos(heading)
+        heading = (heading + heading_change) % (2 * pi)
+        x = center_x + radius * sin(heading)
+        y = center_y - radius * cos(heading)
 
-    return (x, y, theta)
+        ################################################################
+        # 1) Modify the the old pose to get the center (because the
+        #   old pose is the LiDAR's pose, not the robot's center pose).
+        # 2) Execute your old code, which implements the motion model
+        #   for the center of the robot.
+        # 3) Modify the result to get back the LiDAR pose from
+        #   your computed center. This is the value you have to return.
+        ##############################################################
+
+    return (x, y, heading)
 
 if __name__ == '__main__':
     import os

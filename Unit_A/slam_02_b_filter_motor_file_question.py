@@ -11,34 +11,48 @@ from lego_robot import *
 
 # This function takes the old (x, y, heading) pose and the motor ticks
 # (ticks_left, ticks_right) and returns the new (x, y, heading).
-def filter_step(old_pose, motor_ticks, ticks_to_mm, robot_width,
+def filter_step(old_pose, motor_ticks, mm_per_tick, robot_width,
                 scanner_displacement):
+    x, y, heading = old_pose
+    left, right = motor_ticks
+    left = left * mm_per_tick
+    right = right * mm_per_tick
+    heading_change = (right - left) / robot_width
 
-    # Find out if there is a turn at all.
-    if motor_ticks[0] == motor_ticks[1]:
-        # No turn. Just drive straight.
-
-        # --->>> Use your previous implementation.
+    if heading_change == 0:
+        # The Robot did not Turn. It just drove straight.
+        x = x + left * cos(heading)
+        y = y + left * sin(heading)
+        ##############################################################
         # Think about if you need to modify your old code due to the
         # scanner displacement?
-        
-        return (x, y, theta)
+        #################################################################
 
     else:
-        # Turn. Compute alpha, R, etc.
+        # The Robot Turned
+        x = x - scanner_displacement * cos(heading)
+        y = y - scanner_displacement * sin(heading)
+        radius = left / heading_change + robot_width / 2.
+        center_x = x - radius * sin(heading)
+        center_y = y + radius * cos(heading)
+        heading = (heading + heading_change) % (2 * pi)
+        x = center_x + radius * sin(heading)
+        y = center_y - radius * cos(heading)
+        x = x + scanner_displacement * cos(heading)
+        y = y + scanner_displacement * sin(heading)
 
-        # --->>> Modify your previous implementation.
-        # First modify the the old pose to get the center (because the
+        ################################################################
+        # 1) Modify the the old pose to get the center (because the
         #   old pose is the LiDAR's pose, not the robot's center pose).
-        # Second, execute your old code, which implements the motion model
+        # 2) Execute your old code, which implements the motion model
         #   for the center of the robot.
-        # Third, modify the result to get back the LiDAR pose from
+        # 3) Modify the result to get back the LiDAR pose from
         #   your computed center. This is the value you have to return.
+        ##############################################################
 
-        return (x, y, theta)
+    return (x, y, heading)
 
 if __name__ == '__main__':
-    
     import os
     os.chdir("Unit_A")
     # Empirically derived distance between scanner and assumed
@@ -68,5 +82,8 @@ if __name__ == '__main__':
     # Write all filtered positions to file.
     f = open("poses_from_ticks.txt", "w")
     for pose in filtered:
-        print >> f, "F %f %f %f" % pose
+        x, y, heading = pose
+        line = "F " + str(x) + " " + str(y) + " " + str(heading)
+        f.write(line + "\n")
+        print(line)
     f.close()
