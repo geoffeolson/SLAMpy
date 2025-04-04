@@ -15,6 +15,31 @@ def move(distribution, delta):
 
 # --->>> Copy your convolve(a, b) and multiply(a, b) functions here.
 
+def convolve(a, b):
+    """Convolve distribution a and b and return the resulting new distribution."""
+    values = []
+    start = a.start() + b.start()
+    stop = a.stop() + b.stop()
+    for i in range(start, stop):
+        value = 0.0
+        for j in range(a.start(), a.stop()):
+            value += a.value(j) * b.value(i - j)
+        values.append(value)
+    distribution = Distribution(start, values)
+    distribution.normalize()
+    return distribution
+
+def multiply(a, b):
+    """Multiply two distributions and return the resulting distribution."""
+    values = []
+    start = max(a.start(), b.start())
+    stop = min(a.stop(), b.stop())
+    for i in range(start, stop):
+        value = a.value(i) * b.value(i)
+        values.append(value)
+    distribution = Distribution(start, values)
+    distribution.normalize()
+    return distribution
 
 
 if __name__ == '__main__':
@@ -24,7 +49,7 @@ if __name__ == '__main__':
     start_position = 10
     position = Distribution.unit_pulse(start_position)
     plot(position.plotlists(*arena)[0], position.plotlists(*arena)[1],
-         linestyle='steps')
+          drawstyle='steps')
 
     # Movement data.
     controls  =    [ 20 ] * 10
@@ -39,17 +64,17 @@ if __name__ == '__main__':
         measurements.append(p)
 
     # This is the filter loop.
-    for i in xrange(len(controls)):
+    for i in range(len(controls)):
         # Move, by convolution. Also termed "prediction".
         control = Distribution.triangle(controls[i], 10)
         position = convolve(position, control)
         plot(position.plotlists(*arena)[0], position.plotlists(*arena)[1],
-             color='b', linestyle='steps')
+             color='b',  drawstyle='steps')
 
         # Measure, by multiplication. Also termed "correction".
-        measurement = Distribution.triangle(measurements[i], 10)
+        measurement = Distribution.triangle(measurements[i], 50)
         position = multiply(position, measurement)
         plot(position.plotlists(*arena)[0], position.plotlists(*arena)[1],
-             color='r', linestyle='steps')
+             color='r',  drawstyle='steps')
 
     show()
