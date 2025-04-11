@@ -31,7 +31,10 @@ class ExtendedKalmanFilter:
         theta = state[2]
         l, r = control
         if r != l:
-
+            alpha = (r - l) / w
+            rad = l/alpha
+            dg1_dtheta = (rad + w/2.)*(cos(theta+alpha) - cos(theta))
+            dg2_dtheta = (rad + w/2.)*(sin(theta+alpha) - sin(theta))
             # --->>> Put your code here.
             # This is for the case r != l.
             # g has 3 components and the state has 3 components, so the
@@ -40,7 +43,10 @@ class ExtendedKalmanFilter:
             # use: m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
             # where 1, 2, 3 are the values of the first row of the matrix.
             # Don't forget to return this matrix.
-            m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])  # Replace this.
+            m = array([
+                [1, 0, dg1_dtheta], 
+                [0, 1, dg2_dtheta], 
+                [0, 0, 1]])
 
         else:
 

@@ -39,15 +39,15 @@ def histogram_filter_step(belief, control, measurement):
 # Main
 #
 if __name__ == '__main__':
-    arena = (0,200)
+    arena = (0,300)
     Dist = Distribution.triangle  # Distribution.triangle or Distribution.gaussian.
 
     # Start position. Well known, so the distribution is narrow.
     position = Dist(10, 1)
 
     # Controls and measurements.
-    controls = [ Dist(40, 10), Dist(70, 10) ]
-    measurements = [ Dist(60, 10), Dist(140, 20) ]
+    controls = [ Dist(40, 20), Dist(70, 20), Dist(70, 20)]
+    measurements = [ Dist(80, 20), Dist(160, 20), Dist(250, 20) ]
 
     # This is the filter loop.
     for i in range(len(controls)):

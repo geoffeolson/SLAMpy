@@ -137,7 +137,10 @@ class LegoLogfile(object):
                     self.landmarks = []
                     first_landmarks = False
                 if sp[1] == 'C':
-                    self.landmarks.append( tuple(['C'] + map(float, sp[2:])) )
+                    a = map(float, sp[2:])
+                    b = list(a)
+                    c = ['C'] + b
+                    self.landmarks.append( tuple(['C'] + list(map(float, sp[2:]))))
                     
             # D is detected landmarks (in each scan).
             # File format: D <type> info...

@@ -3,8 +3,9 @@
 # Claus Brenner, 29 NOV 2012
 from distribution import *
 from math import sqrt
-from matplotlib.mlab import normpdf
+#from matplotlib.mlab import normpdf
 from pylab import plot, show, ylim
+from scipy.stats import norm
 
 # Import the helper functions from a previous file.
 # If you implemented these functions in another file, put the filename here.
@@ -21,19 +22,19 @@ class Density:
 def histogram_plot(prediction, measurement, correction):
     """Helper to draw all curves in each filter step."""
     plot(prediction.plotlists(*arena)[0], prediction.plotlists(*arena)[1],
-         color='#C0C0FF', linestyle='steps', linewidth=5)
+         color='#C0C0FF', drawstyle='steps', linewidth=5)
     plot(measurement.plotlists(*arena)[0], measurement.plotlists(*arena)[1],
-         color='#C0FFC0', linestyle='steps', linewidth=5)    
+         color='#C0FFC0', drawstyle='steps', linewidth=5)    
     plot(correction.plotlists(*arena)[0], correction.plotlists(*arena)[1],
-         color='#FFC0C0', linestyle='steps', linewidth=5)
+         color='#FFC0C0', drawstyle='steps', linewidth=5)
 
 def kalman_plot(prediction, measurement, correction):
     """Helper to draw all curves in each filter step."""
-    plot([normpdf(x, prediction.mu, sqrt(prediction.sigma2))
+    plot([norm.pdf(x, prediction.mu, sqrt(prediction.sigma2))
           for x in range(*arena)], color = 'b', linewidth=2)
-    plot([normpdf(x, measurement.mu, sqrt(measurement.sigma2))
+    plot([norm.pdf(x, measurement.mu, sqrt(measurement.sigma2))
           for x in range(*arena)], color = 'g', linewidth=2)
-    plot([normpdf(x, correction.mu, sqrt(correction.sigma2))
+    plot([norm.pdf(x, correction.mu, sqrt(correction.sigma2))
           for x in range(*arena)], color = 'r', linewidth=2)
 
 #
@@ -52,14 +53,17 @@ def histogram_filter_step(belief, control, measurement):
 #
 def kalman_filter_step(belief, control, measurement):
     """Bayes filter step implementation: Kalman filter."""
+    prediction = Density(0, 0)
+    correction = Density(0, 0)
 
-    # --->>> Put your code here.
-    
     # Prediction.
-    prediction = Density(belief.mu + 10.0, belief.sigma2 + 100.0)  # Replace
+    prediction.mu = belief.mu + control.mu
+    prediction.sigma2 = belief.sigma2 + control.sigma2
 
     # Correction.
-    correction = prediction  # Replace
+    k = prediction.sigma2 / (prediction.sigma2 + measurement.sigma2)
+    correction.mu = prediction.mu + k * (measurement.mu - prediction.mu)
+    correction.sigma2 = (1 - k) * prediction.sigma2
 
     return (prediction, correction)
 
@@ -81,7 +85,7 @@ if __name__ == '__main__':
     measurements_ = [ Density(60, 10**2), Density(140, 20**2) ]  # Kalman
 
     # This is the filter loop.
-    for i in xrange(len(controls)):
+    for i in range(len(controls)):
         # Histogram
         (prediction, position) = histogram_filter_step(position, controls[i], measurements[i])
         histogram_plot(prediction, measurements[i], position)
