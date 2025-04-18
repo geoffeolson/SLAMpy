@@ -288,20 +288,39 @@ if __name__ == '__main__':
         matched_ref_cylinders.append([m[1] for m in observations])
 
     # Write all states, all state covariances, and matched cylinders to file.
-    f = open("kalman_prediction_and_correction.txt", "w")
-    for i in range(len(states)):
-        # Output the center of the scanner, not the center of the robot.
-        print >> f, "F %f %f %f" % \
-            tuple(states[i] + [scanner_displacement * cos(states[i][2]),
-                               scanner_displacement * sin(states[i][2]),
-                               0.0])
-        # Convert covariance matrix to angle stddev1 stddev2 stddev-heading form
-        e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
-        print >> f, "E %f %f %f %f" % (e + (sqrt(covariances[i][2,2]),))
-        # Also, write matched cylinders.
-        write_cylinders(f, "W C", matched_ref_cylinders[i])        
+    with open("kalman_prediction_and_correction.txt", "w") as f:
+        for i in range(len(states)):
+            # Output the center of the scanner, not the center of the robot.
+            # print >> f, "F %f %f %f" % \
+            x = tuple(states[i] + [scanner_displacement * cos(states[i][2]),
+                                   scanner_displacement * sin(states[i][2]),
+                                   0.0])
+            line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n" 
+            f.write(line)
+            e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
+            q = (e + (sqrt(covariances[i][2,2]),))
+            line = "E " + str(q[0]) + " " + str(q[1]) + " " + str(q[2]) + " " + str(q[3]) + "\n" 
+            f.write(line)
+            write_cylinders(f, "W C", matched_ref_cylinders[i])
 
-    f.close()
+### Origional #################################################################
+    # f = open("kalman_prediction_and_correction.txt", "w")
+    # for i in range(len(states)):
+    #     # Output the center of the scanner, not the center of the robot.
+    #     print >> f, "F %f %f %f" % \
+    #         tuple(states[i] + [scanner_displacement * cos(states[i][2]),
+    #                            scanner_displacement * sin(states[i][2]),
+    #                            0.0])
+    #     # Convert covariance matrix to angle stddev1 stddev2 stddev-heading form
+    #     e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
+    #     print >> f, "E %f %f %f %f" % (e + (sqrt(covariances[i][2,2]),))
+    #     # Also, write matched cylinders.
+    #     write_cylinders(f, "W C", matched_ref_cylinders[i])        
+
+    # f.close()
+
+
+### Example #####################################################################################
 
         # Write all states, all state covariances, and matched cylinders to file.
     # f = open("kalman_prediction.txt", "w")
@@ -317,16 +336,16 @@ if __name__ == '__main__':
     #     #(angle, sqrt(eigenvals[0]), sqrt(eigenvals[1]))
     # f.close()
 
-    with open("kalman_prediction.txt", "w") as f:
-        for i in range(len(states)):
-            # Output the center of the scanner, not the center of the robot.
-            #print >> f, "F %f %f %f" % \
-            x = tuple(states[i] + [scanner_displacement * cos(states[i][2]),
-                            scanner_displacement * sin(states[i][2]),
-                            0.0])
-            line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n" 
-            f.write(line)
-            e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
-            q = (e + (sqrt(covariances[i][2,2]),))
-            line = "E " + str(q[0]) + " " + str(q[1]) + " " + str(q[2]) + " " + str(q[3]) + "\n" 
-            f.write(line)
+    # with open("kalman_prediction.txt", "w") as f:
+    #     for i in range(len(states)):
+    #         # Output the center of the scanner, not the center of the robot.
+    #         #print >> f, "F %f %f %f" % \
+    #         x = tuple(states[i] + [scanner_displacement * cos(states[i][2]),
+    #                         scanner_displacement * sin(states[i][2]),
+    #                         0.0])
+    #         line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n" 
+    #         f.write(line)
+    #         e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
+    #         q = (e + (sqrt(covariances[i][2,2]),))
+    #         line = "E " + str(q[0]) + " " + str(q[1]) + " " + str(q[2]) + " " + str(q[3]) + "\n" 
+    #         f.write(line)
