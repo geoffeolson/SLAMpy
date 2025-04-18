@@ -6,6 +6,8 @@
 from lego_robot import *
 from math import sqrt, atan2, sin, cos
 from numpy import *
+import os
+os.chdir("Unit_D")
 
 
 class ExtendedKalmanFilter:
@@ -23,14 +25,30 @@ class ExtendedKalmanFilter:
 
     @staticmethod
     def dh_dstate(state, landmark, scanner_displacement):
-
+        x, y, theta = state
+        xm, ym = landmark
+        d = scanner_displacement
         # --->>> Insert your code here.
         # Note that:
         # x y theta is state[0] state[1] state[2]
         # x_m y_m is landmark[0] landmark[1]
         # The Jacobian of h is a 2x3 matrix.
+        xl = x + d * cos(theta)
+        yl = y + d * sin(theta)
+        dx = (xm - xl)
+        dy = (ym - yl)
+        q = dx**2 + dy**2
+        dr_dx = - dx / sqrt(q)
+        dr_dy = - dy / sqrt(q)
+        dr_dtheta = d / sqrt(q) * (dx * sin(theta) - dy * cos(theta))
+        da_dx = dy / q
+        da_dy = - dx / q
+        da_dtheta = - d / q * (dx * cos(theta) + dy * sin(theta)) - 1
+        m = array([
+            [dr_dx, dr_dy, dr_dtheta], 
+            [da_dx, da_dy, da_dtheta]])
 
-        return array([[1, 2, 3], [4, 5, 6]]) # Replace this.
+        return m
 
 
 if __name__ == '__main__':
@@ -48,7 +66,7 @@ if __name__ == '__main__':
     w = 150.0
 
     # Compute derivative numerically.
-    print "Numeric differentiation dx, dy, dtheta:"
+    print( "Numeric differentiation dx, dy, dtheta:")
     delta = 1e-7
     state_x = array([x + delta, y, theta])
     state_y = array([x, y + delta, theta])
@@ -60,16 +78,16 @@ if __name__ == '__main__':
     dh_dtheta = (ExtendedKalmanFilter.h(state_theta, landmark, scanner_displacement) -\
                  ExtendedKalmanFilter.h(state, landmark, scanner_displacement)) / delta
     dh_dstate_numeric = column_stack([dh_dx, dh_dy, dh_dtheta])
-    print dh_dstate_numeric
+    print( dh_dstate_numeric)
 
     # Use the above code to compute the derivative analytically.
-    print "Analytic differentiation dx, dy, dtheta:"
+    print ("Analytic differentiation dx, dy, dtheta:")
     dh_dstate_analytic = ExtendedKalmanFilter.dh_dstate(
         state, landmark, scanner_displacement)
-    print dh_dstate_analytic
+    print( dh_dstate_analytic)
 
     # The difference should be close to zero (depending on the setting of
     # delta, above).
-    print "Difference:"
-    print dh_dstate_numeric - dh_dstate_analytic
-    print "Seems correct:", allclose(dh_dstate_numeric, dh_dstate_analytic)
+    print ("Difference:")
+    print (dh_dstate_numeric - dh_dstate_analytic)
+    print ("Seems correct:", allclose(dh_dstate_numeric, dh_dstate_analytic))
