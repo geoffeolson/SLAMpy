@@ -224,7 +224,8 @@ class ExtendedKalmanFilter:
         K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
         innovation = array(measurement) - self.h(self.state, landmark, self.scanner_displacement)
         innovation[1] = (innovation[1] + pi) % (2*pi) - pi
-        self.state = self.state + dot(K, innovation)
+        self.state = self.state + K @ innovation
+        self.covariance = (eye(3) - K @ H) @ S
 
 if __name__ == '__main__':
     # Robot constants.

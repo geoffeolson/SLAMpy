@@ -5,6 +5,8 @@
 from lego_robot import *
 from math import sin, cos, pi, sqrt
 import random
+import os
+os.chdir("Unit_E")
 
 class ParticleFilter:
     def __init__(self, initial_particles,
@@ -51,15 +53,35 @@ class ParticleFilter:
         # In the end, assign the new list of particles to self.particles.
         # For sampling, use random.gauss(mu, sigma). (Note sigma in this call
         # is the standard deviation, not the variance.)
+        a1 = self.control_motion_factor
+        a2 = self.control_turn_factor
+        Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
+        Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
+        for i in range(len(self.particles)):
+            # Sample from the normal distribution.
+            left_ = random.gauss(left, sqrt(Gl2))
+            right_ = random.gauss(right, sqrt(Gr2))
+            # Compute new particle position.
+            self.particles[i] = ParticleFilter.g(self.particles[i], (left_, right_), self.robot_width)
+
+
 
     def print_particles(self, file_desc):
         """Prints particles to given file_desc output."""
         if not self.particles:
             return
-        print >> file_desc, "PA",
+        file_desc.write("PA")
         for p in self.particles:
-            print >> file_desc, "%.0f %.0f %.3f" % p,
-        print >> file_desc
+            line = str(p[0]) + " " + str(p[1]) + " " + str(p[2]) + "\n" 
+            file_desc.write(line)
+        file_desc.write("\n")
+
+        # print >> file_desc, "PA",
+        # f.write("PA")
+        # for p in self.particles:
+        #     print >> file_desc, "%.0f %.0f %.3f" % p,
+        #     line = str(p[0]) + " " + str(p[1]) + " " + str(p[2]) + "\n" 
+        #     f.write(line)
 
 
 if __name__ == '__main__':
@@ -77,10 +99,10 @@ if __name__ == '__main__':
     measured_state = (1850.0, 1897.0, 213.0 / 180.0 * pi)
     standard_deviations = (100.0, 100.0, 10.0 / 180.0 * pi)
     initial_particles = []
-    for i in xrange(number_of_particles):
+    for i in range(number_of_particles):
         initial_particles.append(tuple([
             random.gauss(measured_state[j], standard_deviations[j])
-            for j in xrange(3)]))
+            for j in range(3)]))
 
     # Setup filter.
     pf = ParticleFilter(initial_particles,
@@ -93,13 +115,39 @@ if __name__ == '__main__':
 
     # Loop over all motor tick records.
     # This is the particle filter loop, with prediction and correction.
-    f = open("particle_filter_predicted.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
-        # Prediction.
-        control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
-        pf.predict(control)
+    #########################################################
+    # f = open("particle_filter_predicted.txt", "w")
+    # for i in range(len(logfile.motor_ticks)):
+    #     # Prediction.
+    #     control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
+    #     pf.predict(control)
 
-        # Output particles.
-        pf.print_particles(f)
+    #     # Output particles.
+    #     pf.print_particles(f)
 
-    f.close()
+    # f.close()
+    ################################################################
+
+    with open("particle_filter_predicted.txt", "w") as f:
+        for i in range(len(logfile.motor_ticks)):
+
+            control = list(map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i]))
+            pf.predict(control)
+            pf.print_particles(f)
+
+
+            # pf.predict(control)
+            # # Output particles.
+            # pf.print_particles(f)
+
+            # x = tuple(states[i] + [scanner_displacement * cos(states[i][2]),
+            #                        scanner_displacement * sin(states[i][2]),
+            #                        0.0])
+            # line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n" 
+            # f.write(line)
+            # e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
+            # q = (e + (sqrt(covariances[i][2,2]),))
+            # line = "E " + str(q[0]) + " " + str(q[1]) + " " + str(q[2]) + " " + str(q[3]) + "\n" 
+            # f.write(line)
+            # write_cylinders(f, "W C", matched_ref_cylinders[i])
+
