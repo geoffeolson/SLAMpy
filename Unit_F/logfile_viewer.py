@@ -1,9 +1,13 @@
 # Python routines to inspect a ikg LEGO robot logfile.
 # Author: Claus Brenner, 28 OCT 2012
-from Tkinter import *
-import tkFileDialog
+
+from ast import Tuple
+from tkinter import *
+from tkinter import filedialog
 from lego_robot import *
 from math import sin, cos, pi, ceil
+import os
+os.chdir("Unit_F")
 
 # The canvas and world extents of the scene.
 # Canvas extents in pixels, world extents in millimeters.
@@ -19,10 +23,10 @@ max_scanner_range = 2200.0
 
 class DrawableObject(object):
     def draw(self, at_step):
-        print "To be overwritten - will draw a certain point in time:", at_step
+        print ("To be overwritten - will draw a certain point in time:", at_step)
 
     def background_draw(self):
-        print "Background draw."
+        print ("Background draw.")
 
     @staticmethod
     def get_ellipse_points(center, main_axis_angle, radius1, radius2,
@@ -37,7 +41,7 @@ class DrawableObject(object):
         N = int(ceil((end_angle - start_angle) / (2 * pi) * N_full))
         N = max(N, 1)
         increment = (end_angle - start_angle) / N
-        for i in xrange(N + 1):
+        for i in range(N + 1):
             a = start_angle + i * increment
             c = cos(a)
             s = sin(a)
@@ -209,10 +213,10 @@ class Points(DrawableObject):
 
     def draw(self, at_step):
         if self.cursor_objects:
-            map(self.canvas.delete, self.cursor_objects)
+            list( map(self.canvas.delete, self.cursor_objects))
             self.cursor_objects = []
         if at_step < len(self.points):
-            for i in xrange(len(self.points[at_step])):
+            for i in range(len(self.points[at_step])):
                 # Draw point.
                 c = self.points[at_step][i]
                 self.cursor_objects.append(self.canvas.create_oval(
@@ -243,7 +247,7 @@ class Particles(DrawableObject):
 
     def draw(self, at_step):
         if self.cursor_objects:
-            map(self.canvas.delete, self.cursor_objects)
+            list(map(self.canvas.delete, self.cursor_objects))
             self.cursor_objects = []
         if at_step < len(self.particles):
             for c in self.particles[at_step]:
@@ -284,7 +288,7 @@ def slider_moved(index):
     info.config(text=logfile.info(i))
 
 def add_file():
-    filename = tkFileDialog.askopenfilename(filetypes = [("all files", ".*"), ("txt files", ".txt")])
+    filename = filedialog.askopenfilename(filetypes = [("all files", ".*"), ("txt files", ".txt")])
     if filename:
         # If the file is in the list already, remove it (so it will be appended
         # at the end).
@@ -337,7 +341,7 @@ def load_data():
     if logfile.detected_cylinders and logfile.filtered_positions and \
         len(logfile.filtered_positions[0]) > 2:
         positions = []
-        for i in xrange(min(len(logfile.detected_cylinders), len(logfile.filtered_positions))):
+        for i in range(min(len(logfile.detected_cylinders), len(logfile.filtered_positions))):
             this_pose_positions = []
             pos = logfile.filtered_positions[i]
             dx = cos(pos[2])
@@ -408,6 +412,6 @@ if __name__ == '__main__':
     # Ask for file.
     all_file_names = []
     add_file()
-
+    slider_moved(0)
     root.mainloop()
-    root.destroy()
+    #root.destroy()

@@ -8,23 +8,33 @@ from lego_robot import LegoLogfile
 # Line header defines the start of each line, e.g. "D C" for a detected
 # cylinder or "W C" for a world cylinder.
 def write_cylinders(file_desc, line_header, cylinder_list):
-    print >> file_desc, line_header,
+    # print >> file_desc, line_header,
+    # for c in cylinder_list:
+    #     print >> file_desc, "%.1f %.1f" % c,
+    # print >> file_desc
+    file_desc.write(line_header)
     for c in cylinder_list:
-        print >> file_desc, "%.1f %.1f" % c,
-    print >> file_desc
+        line = " " + str(c[0]) + " " + str(c[1])
+        file_desc.write(line)
+    file_desc.write("\n")
     
 # Utility to write a list of error ellipses to (one line of) a given file.
 # Line header defines the start of each line.
 def write_error_ellipses(file_desc, line_header, error_ellipse_list):
-    print >> file_desc, line_header,
-    for e in error_ellipse_list:
-        print >> file_desc, "%.3f %.1f %.1f" % e,
-    print >> file_desc
+    # print >> file_desc, line_header,
+    # for e in error_ellipse_list:
+    #     print >> file_desc, "%.3f %.1f %.1f" % e,
+    # print >> file_desc
+    file_desc.write(line_header)
+    for c in error_ellipse_list:
+        line = " " + str(c[0]) + " " + str(c[1]) + " " + str(c[2])
+        file_desc.write(line)
+    file_desc.write("\n")
 
 # Find the derivative in scan data, ignoring invalid measurements.
 def compute_derivative(scan, min_dist):
     jumps = [ 0 ]
-    for i in xrange(1, len(scan) - 1):
+    for i in range(1, len(scan) - 1):
         l = scan[i-1]
         r = scan[i+1]
         if l > min_dist and r > min_dist:
@@ -42,7 +52,7 @@ def find_cylinders(scan, scan_derivative, jump, min_dist):
     on_cylinder = False
     sum_ray, sum_depth, rays = 0.0, 0.0, 0
 
-    for i in xrange(len(scan_derivative)):
+    for i in range(len(scan_derivative)):
         if scan_derivative[i] < -jump:
             # Start a new cylinder, independent of on_cylinder.
             on_cylinder = True
@@ -103,7 +113,7 @@ def get_observations(scan, jump, min_dist, cylinder_offset,
         # Find closest cylinder in the state.
         best_dist_2 = max_cylinder_distance * max_cylinder_distance
         best_index = -1
-        for index in xrange(robot.number_of_landmarks):
+        for index in range(robot.number_of_landmarks):
             pole_x, pole_y = robot.state[3+2*index : 3+2*index+2]
             dx, dy = pole_x - x, pole_y - y
             dist_2 = dx * dx + dy * dy

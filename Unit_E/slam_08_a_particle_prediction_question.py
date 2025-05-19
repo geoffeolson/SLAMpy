@@ -41,10 +41,6 @@ class ParticleFilter:
 
     def predict(self, control):
         """The prediction step of the particle filter."""
-        left, right = control
-
-        # --->>> Put your code here.
-
         # Compute left and right variance.
         # alpha_1 is self.control_motion_factor.
         # alpha_2 is self.control_turn_factor.
@@ -53,6 +49,7 @@ class ParticleFilter:
         # In the end, assign the new list of particles to self.particles.
         # For sampling, use random.gauss(mu, sigma). (Note sigma in this call
         # is the standard deviation, not the variance.)
+        left, right = control
         a1 = self.control_motion_factor
         a2 = self.control_turn_factor
         Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
@@ -72,17 +69,9 @@ class ParticleFilter:
             return
         file_desc.write("PA")
         for p in self.particles:
-            line = str(p[0]) + " " + str(p[1]) + " " + str(p[2]) + "\n" 
+            line = " " + str(p[0]) + " " + str(p[1]) + " " + str(p[2])# + " "# + "\n" 
             file_desc.write(line)
         file_desc.write("\n")
-
-        # print >> file_desc, "PA",
-        # f.write("PA")
-        # for p in self.particles:
-        #     print >> file_desc, "%.0f %.0f %.3f" % p,
-        #     line = str(p[0]) + " " + str(p[1]) + " " + str(p[2]) + "\n" 
-        #     f.write(line)
-
 
 if __name__ == '__main__':
     # Robot constants.
@@ -115,39 +104,10 @@ if __name__ == '__main__':
 
     # Loop over all motor tick records.
     # This is the particle filter loop, with prediction and correction.
-    #########################################################
-    # f = open("particle_filter_predicted.txt", "w")
-    # for i in range(len(logfile.motor_ticks)):
-    #     # Prediction.
-    #     control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
-    #     pf.predict(control)
-
-    #     # Output particles.
-    #     pf.print_particles(f)
-
-    # f.close()
-    ################################################################
-
     with open("particle_filter_predicted.txt", "w") as f:
         for i in range(len(logfile.motor_ticks)):
 
             control = list(map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i]))
             pf.predict(control)
             pf.print_particles(f)
-
-
-            # pf.predict(control)
-            # # Output particles.
-            # pf.print_particles(f)
-
-            # x = tuple(states[i] + [scanner_displacement * cos(states[i][2]),
-            #                        scanner_displacement * sin(states[i][2]),
-            #                        0.0])
-            # line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n" 
-            # f.write(line)
-            # e = ExtendedKalmanFilter.get_error_ellipse(covariances[i])
-            # q = (e + (sqrt(covariances[i][2,2]),))
-            # line = "E " + str(q[0]) + " " + str(q[1]) + " " + str(q[2]) + " " + str(q[3]) + "\n" 
-            # f.write(line)
-            # write_cylinders(f, "W C", matched_ref_cylinders[i])
 

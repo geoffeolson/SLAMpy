@@ -1,6 +1,7 @@
 # Python routines useful for handling ikg's LEGO robot data.
 # Author: Claus Brenner, 28.10.2012
 from math import sin, cos, pi
+from tkinter import N
 
 # In previous versions, the S record included the number of scan points.
 # If so, set this to true.
@@ -156,8 +157,8 @@ class LegoLogfile(object):
                     if first_detected_cylinders:
                         self.detected_cylinders = []
                         first_detected_cylinders = False
-                    cyl = map(float, sp[2:])
-                    self.detected_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(len(cyl)/2)])
+                    cyl = tuple(map(float, sp[2:]))
+                    self.detected_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(int(len(cyl)/2))])
 
             # W is information to be plotted in the world (in each scan).
             # File format: W <type> info...
@@ -176,14 +177,16 @@ class LegoLogfile(object):
                     if first_world_cylinders:
                         self.world_cylinders = []
                         first_world_cylinders = False
-                    cyl = map(float, sp[2:])
-                    self.world_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(len(cyl)/2)])
+                    cyl = tuple(map(float, sp[2:]))
+                    N = int(len(cyl) / 2)
+                    self.world_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(N)])
                 elif sp[1] == 'E':
                     if first_world_ellipses:
                         self.world_ellipses = []
                         first_world_ellipses = False
-                    ell = map(float, sp[2:])
-                    self.world_ellipses.append([(ell[3*i], ell[3*i+1], ell[3*i+2]) for i in xrange(len(ell)/3)])
+                    ell = tuple(map(float, sp[2:]))
+
+                    self.world_ellipses.append([(ell[3*i], ell[3*i+1], ell[3*i+2]) for i in range(int(len(ell)/3))])
 
             # PA is particles.
             # File format:

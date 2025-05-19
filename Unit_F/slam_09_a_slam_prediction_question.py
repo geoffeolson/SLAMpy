@@ -5,6 +5,8 @@
 from lego_robot import *
 from math import sin, cos, pi, atan2, sqrt
 from numpy import *
+import os
+os.chdir("Unit_F")
 
 class ExtendedKalmanFilterSLAM:
     def __init__(self, state, covariance,
@@ -65,16 +67,16 @@ class ExtendedKalmanFilterSLAM:
             rml = r - l
             rml2 = rml * rml
             theta_ = theta + rml/w
-            dg1dl = w*r/rml2*(sin(theta_)-sin(theta))  - (r+l)/(2*rml)*cos(theta_)
-            dg2dl = w*r/rml2*(-cos(theta_)+cos(theta)) - (r+l)/(2*rml)*sin(theta_)
-            dg1dr = (-w*l)/rml2*(sin(theta_)-sin(theta)) + (r+l)/(2*rml)*cos(theta_)
+            dg1dl =    w*r/rml2*( sin(theta_)-sin(theta)) - (r+l)/(2*rml)*cos(theta_)
+            dg2dl =    w*r/rml2*(-cos(theta_)+cos(theta)) - (r+l)/(2*rml)*sin(theta_)
+            dg1dr = (-w*l)/rml2*( sin(theta_)-sin(theta)) + (r+l)/(2*rml)*cos(theta_)
             dg2dr = (-w*l)/rml2*(-cos(theta_)+cos(theta)) + (r+l)/(2*rml)*sin(theta_)
             
         else:
-            dg1dl = 0.5*(cos(theta) + l/w*sin(theta))
-            dg2dl = 0.5*(sin(theta) - l/w*cos(theta))
-            dg1dr = 0.5*(-l/w*sin(theta) + cos(theta))
-            dg2dr = 0.5*(l/w*cos(theta) + sin(theta))
+            dg1dl = 0.5*(     cos(theta) + l/w*sin(theta))
+            dg2dl = 0.5*(     sin(theta) - l/w*cos(theta))
+            dg1dr = 0.5*(-l/w*sin(theta) +     cos(theta))
+            dg2dr = 0.5*( l/w*cos(theta) +     sin(theta))
 
         dg3dl = -1.0/w
         dg3dr = 1.0/w
@@ -98,7 +100,6 @@ class ExtendedKalmanFilterSLAM:
         R3 = dot(V, dot(control_covariance, V.T))
 
         # --->>> Put your code here.
-
         # Hints:
         # - The number of landmarks is self.number_of_landmarks.
         # - eye(n) is the numpy function which returns a n x n identity matrix.
@@ -110,11 +111,21 @@ class ExtendedKalmanFilterSLAM:
         #   elements 1 and 2, but not 3.
         # - All matrix and vector indices start at 0.
 
+
         # Now enlarge G3 and R3 to accomodate all landmarks. Then, compute the
         # new covariance matrix self.covariance.
-        self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        n = 3 + 2 * self.number_of_landmarks
+        Gx = eye(n)
+        Gx[0:3,0:3] = G3
+        Rx = zeros((n,n))
+        Rx[0:3, 0:3] = R3
+        self.covariance = dot(Gx, dot(self.covariance, Gx.T)) + Rx  # Replace this.
         # state' = g(state, control)
-        self.state = self.g(self.state, control, self.robot_width)  # Replace this.
+        robot_pose = self.g(self.state, control, self.robot_width)  # Replace this.
+        self.state[0] = robot_pose[0]
+        self.state[1] = robot_pose[1]
+        self.state[2] = robot_pose[2]
+
 
     @staticmethod
     def get_error_ellipse(covariance):
@@ -157,20 +168,39 @@ if __name__ == '__main__':
     # filtered positions and covariances.
     # This is the EKF SLAM loop.
     f = open("ekf_slam_prediction.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = array(logfile.motor_ticks[i]) * ticks_to_mm
         kf.predict(control)
 
         # End of EKF SLAM - from here on, data is written.
-
+        #  OLD ###########################################################################
         # Output the center of the scanner, not the center of the robot.
-        print >> f, "F %f %f %f" % \
-            tuple(kf.state[0:3] + [scanner_displacement * cos(kf.state[2]),
+        # print >> f, "F %f %f %f" % \
+        #     tuple(kf.state[0:3] + [scanner_displacement * cos(kf.state[2]),
+        #                            scanner_displacement * sin(kf.state[2]),
+        #                            0.0])
+        # # Write covariance matrix in angle stddev1 stddev2 stddev-heading form
+        # e = ExtendedKalmanFilterSLAM.get_error_ellipse(kf.covariance)
+        # print >> f, "E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),))
+
+        #  NEW  ###########################################################################
+        x = tuple(kf.state[0:3] + [scanner_displacement * cos(kf.state[2]),
                                    scanner_displacement * sin(kf.state[2]),
                                    0.0])
-        # Write covariance matrix in angle stddev1 stddev2 stddev-heading form
+        line = "F " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + "\n"
+        f.write(line)
+
+        # # Output error ellipse and standard deviation of heading.
+        # e = pf.get_error_ellipse_and_heading_variance(mean)
+        # print >> f, "E %.3f %.0f %.0f %.3f" % errors
+
+        
+        # # Output error ellipse and standard deviation of heading.
         e = ExtendedKalmanFilterSLAM.get_error_ellipse(kf.covariance)
-        print >> f, "E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),))
+        x = (e + (sqrt(kf.covariance[2,2]),))
+        line = "E " + str(x[0]) + " " + str(x[1]) + " " + str(x[2]) + " " + str(x[3]) + "\n"
+        f.write(line)
+        #####################################################################################
 
     f.close()
