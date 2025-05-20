@@ -7,7 +7,7 @@ from tkinter import filedialog
 from lego_robot import *
 from math import sin, cos, pi, ceil
 import os
-os.chdir("Unit_F")
+os.chdir("Unit_H")
 
 # The canvas and world extents of the scene.
 # Canvas extents in pixels, world extents in millimeters.

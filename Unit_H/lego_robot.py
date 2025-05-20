@@ -1,6 +1,7 @@
 # Python routines useful for handling ikg's LEGO robot data.
 # Author: Claus Brenner, 28.10.2012
 from math import sin, cos, pi
+from tkinter import N
 
 # In previous versions, the S record included the number of scan points.
 # If so, set this to true.
@@ -16,7 +17,9 @@ s_record_has_count = True
 # E (error) standard deviation in position, or position and heading angle
 # L landmark (reference landmark, fixed)
 # D detected landmark, in the scanner's coordinate system. C is cylinders
-# W something to draw in the world coordinate system. C is cylinders.
+# W something to draw in the world coordinate system.
+#   C is cylinders, E is 2D error ellipses
+# PA list of particles (x, y, heading).
 #
 class LegoLogfile(object):
     def __init__(self):
@@ -29,6 +32,8 @@ class LegoLogfile(object):
         self.landmarks = []
         self.detected_cylinders = []
         self.world_cylinders = []
+        self.world_ellipses = []
+        self.particles = []
         self.last_ticks = None
 
     def read(self, filename):
@@ -47,6 +52,8 @@ class LegoLogfile(object):
         first_landmarks = True
         first_detected_cylinders = True
         first_world_cylinders = True
+        first_world_ellipses = True
+        first_particles = True
         f = open(filename)
         for l in f:
             sp = l.split()
@@ -137,10 +144,7 @@ class LegoLogfile(object):
                     self.landmarks = []
                     first_landmarks = False
                 if sp[1] == 'C':
-                    a = map(float, sp[2:])
-                    b = list(a)
-                    c = ['C'] + b
-                    self.landmarks.append( tuple(['C'] + list(map(float, sp[2:]))))
+                    self.landmarks.append( tuple(['C'] + map(float, sp[2:])) )
                     
             # D is detected landmarks (in each scan).
             # File format: D <type> info...
@@ -153,16 +157,54 @@ class LegoLogfile(object):
                     if first_detected_cylinders:
                         self.detected_cylinders = []
                         first_detected_cylinders = False
-                    cyl = list(map(float, sp[2:]))
+                    cyl = tuple(map(float, sp[2:]))
                     self.detected_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(int(len(cyl)/2))])
+
+            # W is information to be plotted in the world (in each scan).
+            # File format: W <type> info...
+            # Supported types:
+            # Cylinder: W C x y x y ...
+            #   Stored: List of lists of (x, y) tuples of the cylinder positions,
+            #   one list per scan.
+            # Error ellipses: W E angle axis1 axis, angle axis1 axis2 ...
+            #   where angle is the ellipse's orientations and axis1 and axis2 are the lenghts
+            #   of the two half axes.
+            #   Stored: List of lists of (angle, axis1, axis2) tuples.
+            #   Note the ellipses can be used only in combination with "W C", which will
+            #   define the center point of the ellipse.
             elif sp[0] == 'W':
                 if sp[1] == 'C':
                     if first_world_cylinders:
                         self.world_cylinders = []
                         first_world_cylinders = False
-                    cyl = list(map(float, sp[2:]))
-                    n = int(len(cyl)/2)
-                    self.world_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(n)])
+                    cyl = tuple(map(float, sp[2:]))
+                    N = int(len(cyl) / 2)
+                    self.world_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(N)])
+                elif sp[1] == 'E':
+                    if first_world_ellipses:
+                        self.world_ellipses = []
+                        first_world_ellipses = False
+                    ell = tuple(map(float, sp[2:]))
+
+                    self.world_ellipses.append([(ell[3*i], ell[3*i+1], ell[3*i+2]) for i in range(int(len(ell)/3))])
+
+            # PA is particles.
+            # File format:
+            #  PA x0, y0, heading0, x1, y1, heading1, ...
+            # Stored: A list of lists of tuples:
+            #  [[(x0, y0, heading0), (x1, y1, heading1),...],
+            #   [(x0, y0, heading0), (x1, y1, heading1),...], ...] 
+            # where each list contains all particles of one time step.
+            elif sp[0] == 'PA':
+                if first_particles:
+                    self.particles = []
+                    first_particles = False
+                i = 1
+                particle_list = []
+                while i < len(sp):
+                    particle_list.append(tuple(map(float, sp[i:i+3])))
+                    i += 3
+                self.particles.append(particle_list)
 
         f.close()
 
@@ -171,7 +213,8 @@ class LegoLogfile(object):
         return max(len(self.reference_positions), len(self.scan_data),
                    len(self.pole_indices), len(self.motor_ticks),
                    len(self.filtered_positions), len(self.filtered_stddev),
-                   len(self.detected_cylinders), len(self.world_cylinders))
+                   len(self.detected_cylinders), len(self.world_cylinders),
+                   len(self.particles))
 
     @staticmethod
     def beam_index_to_angle(i, mounting_angle = -0.06981317007977318):
