@@ -6,7 +6,6 @@ computing residuals, and preparing for Gauss-Newton optimization.
 """
 
 import numpy as np
-from numpy import pi
 
 def v2t(pose_vec):
     """Convert [x, y, theta] → 3×3 homogeneous transform."""
@@ -44,12 +43,11 @@ class GraphSLAM:
         """
         self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
 
-    def compute_error(self, constraint):
+    def compute_error(self, i, j, z_ij):
         """
         Compute the residual e_ij = z_ij - z_hat_ij
         where z_hat_ij is the predicted relative pose from i to j
         """
-        i, j, Zij, _ = constraint
         xi = self.poses[i]
         xj = self.poses[j]
 
@@ -58,9 +56,9 @@ class GraphSLAM:
         Tj = v2t(xj)
 
         Tij_pred = np.linalg.inv(Ti) @ Tj
-        Zij_hat = t2v(Tij_pred)
+        z_hat_ij = t2v(Tij_pred)
 
-        error = Zij - Zij_hat
+        error = z_ij - z_hat_ij
         error[2] = (error[2] + np.pi) % (2 * np.pi) - np.pi
         return error
 
@@ -70,48 +68,4 @@ class GraphSLAM:
             print(f"  x{idx} = {p}")
         print("Constraints:")
         for i, j, z, _ in self.constraints:
-            Zij = np.array([z[0],z[1],z[2] * 180 / pi])
-            print(f"  x{i} → x{j} : {Zij}")
-        print("Error:")
-        for constraint in self.constraints:
-            e_ij = self.compute_error(constraint)
-            e_ij[2] = e_ij[2] * 180 / pi
-            print(f"  x{i} → x{j} : {e_ij}")
-
-
-if __name__ == '__main__':
-    # create Graph Slam object
-    gs = GraphSLAM()
-
-    #Add Poses
-    x0 = [0.0, 0.0, 0.0]   # origin
-    x1 = [1.0, 0.0, 0.0]   # 1 meter forward
-    x2 = [2.0, 0.0, 0.0]   # 2 meter forward
-
-    gs.add_pose(x0)
-    gs.add_pose(x1)
-    gs.add_pose(x2)
-
-    #Add constraint
-    z_ij = [0.9, 0.1, 5 * pi / 180]
-    Omega_ij = [1.0, 1.0, 1.0]
-    gs.add_constraint(0, 1, z_ij, Omega_ij)
-
-    z_ij = [1.1, -0.1, 0.0]
-    Omega_ij = [1.0, 1.0, 1.0]
-    gs.add_constraint(1, 2, z_ij, Omega_ij)
-
-    #print Results
-    gs.print_summary()
-
-    # Expected Output:
-    #     Poses:
-    #   x0 = [0.0 0.0 0.0]
-    #   x1 = [1.0 0.0 0.0]
-    #   x2 = [2.0 0.0 0.0]
-    # Constraints:
-    #   x0 → x1 : [ 0.9  0.1  5.0 ]
-    #   x1 → x2 : [ 1.1 -0.1  0.0 ]
-    # Error:
-    #   x1 → x2 : [-0.1  0.1  5.0 ]
-    #   x1 → x2 : [ 0.1 -0.1  0.0 ]
+            print(f"  x{i} → x{j} : {z}")
