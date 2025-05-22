@@ -74,6 +74,7 @@ class GraphSLAM:
             print(f"  x{i} → x{j} : {Zij}")
         print("Error:")
         for constraint in self.constraints:
+            i, j, _, _ = constraint
             e_ij = self.compute_error(constraint)
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
@@ -94,11 +95,11 @@ if __name__ == '__main__':
 
     #Add constraint
     z_ij = [0.9, 0.1, 5 * pi / 180]
-    Omega_ij = [1.0, 1.0, 1.0]
+    Omega_ij = np.diag([1.0, 1.0, 1.0])
     gs.add_constraint(0, 1, z_ij, Omega_ij)
 
     z_ij = [1.1, -0.1, 0.0]
-    Omega_ij = [1.0, 1.0, 1.0]
+    Omega_ij = np.diag([1.0, 1.0, 1.0])
     gs.add_constraint(1, 2, z_ij, Omega_ij)
 
     #print Results
