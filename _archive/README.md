@@ -3,10 +3,6 @@
 ## Overview
 This document describes the iterative optimization algorithm used for Graph-Based SLAM, based on the Grisetti et al. (2010) tutorial. The algorithm estimates robot poses that minimize the total squared error from relative motion and measurement constraints. The original description (Algorithm 1) lacked some practical implementation details, which are included here.
 
-The algorithm proceeds iteratively to refine the robot's pose estimates. Constraints are defined between pairs of poses using relative motion measurements. The optimization minimizes the total error across all constraints by adjusting the pose variables.
-
-Each iteration builds a linear system from the Jacobians of the constraint error functions. These Jacobians describe how the residual error changes when each pose is perturbed. The system is solved using a sparse matrix method to obtain an update step. The process continues until convergence.
-
 ---
 
 ## Function: `compute_jacobians()`
@@ -26,24 +22,19 @@ Computes the Jacobians of the residual error function with respect to two poses 
 
 Let:
 
-<img src="https://latex.codecogs.com/svg.latex?x_i%20=%20egin{bmatrix}x_i\y_i\	heta_i\end{bmatrix},\quad
-x_j%20=%20egin{bmatrix}x_j\y_j\	heta_j\end{bmatrix},\quad
-\Delta t = egin{bmatrix}x_j - x_i\y_j - y_i\end{bmatrix}" />
+<img src="https://latex.codecogs.com/svg.latex?x_i%20=%20\begin{bmatrix}x_i%20\\%20y_i%20\\%20\Theta_i\end{bmatrix},%20\quad%20x_j%20=%20\begin{bmatrix}x_j%20\\%20y_j%20\\%20\Theta_j\end{bmatrix},%20\quad%20\Delta%20t%20=%20\begin{bmatrix}x_j%20-%20x_i%20\\%20y_j%20-%20y_i\end{bmatrix}" />
+
 
 Then compute Jacobians:
 
 **A_ij:**
 
-<img src="https://latex.codecogs.com/svg.latex?A_{ij}[0:2,0:2]=-R_i^	op,\quad
-A_{ij}[0:2,2]=R_i^	op
-egin{bmatrix}0&-1\1&0\end{bmatrix}
-\Delta t,\quad
-A_{ij}[2,2]=-1" />
+<img src="https://latex.codecogs.com/svg.latex?A_{ij}[0:2,0:2]=-R_i^{op},\quad A_{ij}[0:2,2]=R_i^{op}\begin{bmatrix}0&-1\\1&0\end{bmatrix}\Delta%20t,\quad A_{ij}[2,2]=-1" title="A_ij Jacobian equations" />
+
 
 **B_ij:**
 
-<img src="https://latex.codecogs.com/svg.latex?B_{ij}[0:2,0:2]=R_i^	op,\quad
-B_{ij}[2,2]=1" />
+<img src="https://latex.codecogs.com/svg.latex?B_{ij}[0:2,0:2]=R_i^{op},\quad%20B_{ij}[2,2]=1" title="B_ij Jacobian equations" />
 
 ---
 
@@ -51,9 +42,7 @@ B_{ij}[2,2]=1" />
 
 To verify the correctness of analytical Jacobians, numerical derivatives are computed as follows:
 
-<img src="https://latex.codecogs.com/svg.latex?rac{\partial{e}}{\partial{x_k}}%20pprox%20rac{e(x+\epsilon)-e(x)}{\epsilon}" title="Numerical derivative formula" />
-
-This provides a test for each column of the Jacobian.
+<img src="https://latex.codecogs.com/svg.latex?rac{\partial{e}}{\partial{x_k}}%20pprox%20rac{e(x+\epsilon)-e(x)}{\epsilon}" title="Numerical derivative formula" />
 
 ---
 
