@@ -17,7 +17,7 @@ This document explains the derivation of the Jacobians used in a simple Graph-Ba
 3. **Construct System**
    - Use Jacobians to populate the information matrix $H$ and vector $b$:
      $$
-     H = J^T \Omega J, \quad b += J^T \Omega e
+     H = J^T \Omega J, \quad b = J^T \Omega e
      $$
 
 
