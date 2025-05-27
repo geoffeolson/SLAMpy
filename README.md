@@ -53,7 +53,7 @@ $$
 Each edge in the graph represents a constraint based on a relative pose observation:
 
 $$
-\mathbf{z}_{ij} = egin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta 	heta_{ij} \end{bmatrix}
+\mathbf{z}_{ij} = \begin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta \theta_{ij} \end{bmatrix}
 $$
 
 This observation represents the expected transformation from node $i$ to node $j$, measured in the coordinate frame of node $i$.
