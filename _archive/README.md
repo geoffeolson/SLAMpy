@@ -37,13 +37,13 @@ We define the poses and their relative translation as:
 $$
 \mathbf{x}_i = \begin{bmatrix} x_i \\ y_i \\ \theta_i \end{bmatrix}, \quad
 \mathbf{x}_j = \begin{bmatrix} x_j \\ y_j \\ \theta_j \end{bmatrix}, \quad
-\Delta \mathbf{t} = egin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
+\Delta \mathbf{t} = \begin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
 $$
 
 Let $R_i \in \mathbb{R}^{2 	imes 2}$ be the rotation matrix of pose $\mathbf{x}_i$, and define the skew-symmetric matrix:
 
 $$
-S = egin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}
+S = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}
 $$
 
 ---
@@ -53,7 +53,7 @@ $$
 Each edge in the graph represents a constraint based on a relative pose observation:
 
 $$
-\mathbf{z}_{ij} = egin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta 	heta_{ij} \end{bmatrix}
+\mathbf{z}_{ij} = \begin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta \theta_{ij} \end{bmatrix}
 $$
 
 This observation represents the expected transformation from node $i$ to node $j$, measured in the coordinate frame of node $i$.
@@ -61,7 +61,7 @@ This observation represents the expected transformation from node $i$ to node $j
 The predicted relative pose based on current estimates is:
 
 $$
-\hat{\mathbf{z}}_{ij}=\begin{bmatrix}R_i^op(\mathbf{t}_j-\mathbf{t}_i)\\theta_j-theta_i\end{bmatrix}
+\hat{\mathbf{z}}_{ij} = \begin{bmatrix} R_i^	op (\mathbf{t}_j - \mathbf{t}_i) \\ \theta_j - \theta_i \end{bmatrix}
 $$
 
 The error function is the difference between the observed and predicted relative pose:
@@ -78,12 +78,12 @@ The error function expresses the discrepancy between the observed relative pose 
 
 $$
 A_{ij} =
-egin{bmatrix}
+\begin{bmatrix}
 - R_i^	op & R_i^	op S \Delta \mathbf{t} \\
 \mathbf{0}_{1 	imes 2} & -1
 \end{bmatrix}, \quad
 B_{ij} =
-egin{bmatrix}
+\begin{bmatrix}
 R_i^	op & \mathbf{0}_{2 	imes 1} \\
 \mathbf{0}_{1 	imes 2} & 1
 \end{bmatrix}
