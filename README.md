@@ -39,7 +39,7 @@ We define the poses and their relative translation as:
 $$
 \mathbf{x}_i = \begin{bmatrix} x_i \\ y_i \\ \theta_i \end{bmatrix}, \quad
 \mathbf{x}_j = \begin{bmatrix} x_j \\ y_j \\ \theta_j \end{bmatrix}, \quad
-\Delta \mathbf{t} = egin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
+\Delta \mathbf{t} = \begin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
 $$
 
 Let $R_i \in \mathbb{R}^{2 	imes 2}$ be the rotation matrix of pose $\mathbf{x}_i$, and define the skew-symmetric matrix:
