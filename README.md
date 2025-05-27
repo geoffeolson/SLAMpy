@@ -45,7 +45,7 @@ $$
 Let $R_i \in \mathbb{R}^{2 	imes 2}$ be the rotation matrix of pose $\mathbf{x}_i$, and define the skew-symmetric matrix:
 
 $$
-S = egin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}
+S = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}
 $$
 
 ---
