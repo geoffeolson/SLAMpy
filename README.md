@@ -53,7 +53,11 @@ $$
 Each edge in the graph represents a constraint based on a relative pose observation:
 
 $$
-\mathbf{z}_{ij} = egin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta 	heta_{ij} \end{bmatrix}
+\mathbf{z}_{ij} = \begin{bmatrix}
+\Delta x_{ij} \\
+\Delta y_{ij} \\
+\Delta \theta_{ij}
+\end{bmatrix}
 $$
 
 This observation represents the expected transformation from node $i$ to node $j$, measured in the coordinate frame of node $i$.
@@ -67,7 +71,7 @@ $$
 The error function is the difference between the observed and predicted relative pose:
 
 $$
-\mathbf{e}_{ij} = \mathbf{z}_{ij} - \hat{\mathbf{z}}_{ij}
+e_{ij} = z_{ij} - \hat{\mathbf{z}}_{ij}
 $$
 
 ---
@@ -78,14 +82,17 @@ The error function expresses the discrepancy between the observed relative pose 
 
 $$
 A_{ij} =
-egin{bmatrix}
-- R_i^	op & R_i^	op S \Delta \mathbf{t} \\
-\mathbf{0}_{1 	imes 2} & -1
-\end{bmatrix}, \quad
+\begin{bmatrix}
+R_i^\top & R_i^\top S \Delta \mathbf{t} \\
+\mathbf{0}^\top & -1
+\end{bmatrix}
+$$
+
+$$
 B_{ij} =
-egin{bmatrix}
-R_i^	op & \mathbf{0}_{2 	imes 1} \\
-\mathbf{0}_{1 	imes 2} & 1
+\begin{bmatrix}
+R_i^\top & \mathbf{0}^\top \\
+\mathbf{0}^\top & 1
 \end{bmatrix}
 $$
 
