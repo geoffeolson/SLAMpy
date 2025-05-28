@@ -15,41 +15,39 @@ This document explains the derivation of the Jacobians used in a simple Graph-Ba
 2. **Linearization**
 
    - For each constraint (edge), compute the error between the predicted and observed relative pose.
-   - Linearize the error function using Jacobians \(A_{ij}\) and \(B_{ij}\) with respect to the involved poses \(x_i\) and \(x_j\).
+   - Linearize the error function using Jacobians $A_{ij}$ and $B_{ij}$ with respect to the involved poses $x_i$ and $x_j$.
 
 3. **Construct System**
-
-   - Use Jacobians to populate the information matrix \(H\) and vector \(b\):
-     $$
-     H += J^T \Omega J, \quad b += J^T \Omega e
-     $$
-   - \(\Omega\) is the information (inverse covariance) matrix of the measurement.
+   - Use Jacobians to populate the information matrix $H$ and vector $b$: $\quad H = J^\top \Omega J \qquad b = J^\top \Omega e$
+   - $\Omega$ is the information (inverse covariance) matrix of the measurement.
 
 4. **Solve**
 
-   - Solve the linear system \(H \delta = -b\) using a sparse solver (e.g., Cholesky decomposition).
-   - Update the poses: \(x \leftarrow x + \delta\).
+   - Solve the linear system $H \delta = -b$ using a sparse solver (e.g., Cholesky decomposition).
+   - Update the poses: $x \leftarrow x + \delta$.
 
 5. **Iterate**
 
-   - Repeat linearization and solving until convergence (change in \(\delta\) is small).
+   - Repeat linearization and solving until convergence (change in $\delta$ is small).
 
 ---
 
+
+
 ### Pose Definitions
-
-We define the poses and their relative translation as:
-
 $$
 x_i = \begin{bmatrix} x_i \\ y_i \\ \theta_i \end{bmatrix}, \quad
 x_j = \begin{bmatrix} x_j \\ y_j \\ \theta_j \end{bmatrix}, \quad
 \Delta t = \begin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
 $$
 
-Let \(R_i \in \mathbb{R}^{2 \times 2}\) be the rotation matrix of pose \(x_i\), and define the skew-symmetric matrix:
+Let $R_i$ in $\mathbb{R}^{2 \times 2}$ be the rotation matrix of pose $x_i$, and define the skew-symmetric matrix:
 
 $$
-S = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}
+S = \begin{bmatrix} 
+0 & -1 \\ 
+1 & 0 
+\end{bmatrix}
 $$
 
 ---
@@ -82,12 +80,12 @@ This error is used in the least-squares cost function that drives the optimizati
 
 ### Jacobians
 
-The Jacobians of this function are with respect to the two involved poses \(x_i\) and \(x_j\).
+The Jacobians of this function are with respect to the two involved poses $x_i$ and $x_j$.
 
 $$
 A_{ij} =
 \begin{bmatrix}
-- R_i^\top & R_i^\top S \Delta t \\
+-R_i^\top & R_i^\top S \Delta t \\
 0_{1 \times 2} & -1
 \end{bmatrix}
 $$
@@ -104,6 +102,6 @@ $$
 
 ### Summary
 
-- These Jacobians are used to populate the sparse system matrix \(H\) and vector \(b\) in SLAM optimization.
-- The rotation matrix \(R_i^\top\) transforms global coordinates to local frame \(i\).
-- The skew-symmetric matrix \(S\) arises from the derivative of a rotation operation.
+- These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.
+- The rotation matrix $R_i^\top$ transforms global coordinates to local frame $$.
+- The skew-symmetric matrix $S$ arises from the derivative of a rotation operation.
