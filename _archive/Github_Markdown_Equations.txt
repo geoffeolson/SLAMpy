@@ -1,0 +1,122 @@
+Important GitHub Markdown + LaTeX Rules (From Your Fixes)
+These are rules we can record in your “GitHub Markdown Equations” document:
+
+Use $...$ for inline math.
+
+Use $$...$$ for display math.
+
+Avoid \mathbf{x}_{ij} — especially multiple subscripts inside bolded variables.
+
+Prefer simple subscripted variables like x_{ij}, z_{ij}, A_{ij}.
+
+Avoid commands not supported by KaTeX, such as \begin{align}, \eqref, \text{}, etc.
+
+Avoid escaped control characters (\b, \t, etc.) inside strings opened in Windows editors like Notepad++ — use editors like Visual Studio Code, or GitHub’s online editor.
+
+Use double backslashes \\ for line breaks inside matrices.
+
+Don’t nest too many environments inside one equation (especially on GitHub).
+
+Test changes incrementally on GitHub to ensure rendering before committing all math-heavy sections.
+
+✅ Confirmed LaTeX Formatting Rules
+Use Single Dollar Signs for Inline Math
+Inline equations should use $...$.
+Example:
+$E = mc^2$
+
+Use Double Dollar Signs for Block Math
+Block equations should use $$...$$, with no indentation.
+Example:
+
+markdown
+Copy
+Edit
+$$
+H = J^T \Omega J
+$$
+Avoid Extra Newlines Inside Math Blocks
+Do not insert a blank line before or after $$. This may break rendering.
+❌ Incorrect:
+
+markdown
+Copy
+Edit
+$$
+
+x^2 + y^2 = z^2
+
+$$
+✅ Correct:
+
+markdown
+Copy
+Edit
+$$
+x^2 + y^2 = z^2
+$$
+No LaTeX Environments (e.g., \begin{bmatrix})
+GitHub Markdown does not support LaTeX environments like bmatrix, align, or cases. Use simple inline notation instead.
+❌ \begin{bmatrix} ... \end{bmatrix}
+✅ Use manual formatting like \left[ \begin{array}{cc} ... \end{array} \right] or break into separate lines with plain formatting.
+
+Avoid Backslashes Before Non-LaTeX Commands
+GitHub interprets sequences like \b, \f, \t as escape characters. These should be written carefully or avoided in .md files.
+✅ Use raw string literals or code blocks to prevent escaping, or replace \t with \\t in literal strings.
+
+Avoid Using Multiple Subscripts with \mathbf{}
+GitHub LaTeX rendering often breaks when using multiple subscripts in bolded symbols.
+❌ \mathbf{x}_{ij} (works only once per block, breaks after that)
+✅ Prefer x_{ij} or drop bolding unless absolutely needed.
+
+Do Not Mix Bullet Lists and Block Math Without Care
+When placing block math inside a list item, ensure it is indented properly and doesn't conflict with the list structure. See proposed rule 10.
+
+Use UTF-8 Compatible Editors
+Avoid editors (like Notepad++) that automatically convert backslashes or escape sequences, which may corrupt LaTeX. Use Visual Studio Code, Sublime Text, or GitHub’s web editor instead.
+
+Test Your Markdown in GitHub Directly
+GitHub's LaTeX rendering differs from local editors. Always test .md rendering by previewing on GitHub itself.
+
+🔄 Proposed Rule 10: Equations Inside Bullet Lists
+When using LaTeX block equations ($$...$$) inside a bullet list, GitHub will not render them properly unless the math block is treated as part of the list item’s content. Here are a few strategies:
+
+❌ Don't Do This:
+markdown
+Copy
+Edit
+- Step 3:
+$$
+H = J^T \Omega J
+$$
+GitHub often breaks rendering in this structure.
+
+✅ Recommended:
+Step 3: Use the system matrix and right-hand vector:
+
+𝐻
+=
+𝐽
+𝑇
+Ω
+𝐽
+,
+𝑏
+=
+𝐽
+𝑇
+Ω
+𝑒
+H=J 
+T
+ ΩJ,b=J 
+T
+ Ωe
+Keep the math block indented and part of the same list level as the bullet text.
+
+Alternatively, inline short equations using single $ delimiters:
+
+Step 3: Use the formula $H = J^T \Omega J$ to build the system.
+
+
+
