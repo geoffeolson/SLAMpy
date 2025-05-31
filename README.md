@@ -20,10 +20,10 @@ This document explains the derivation of the Jacobians used in a simple Graph-Ba
 
    - Use Jacobians to populate the information matrix $H$ and vector $b$:
 
-     $$
-     H = J^\top \Omega J \qquad b = J^\top \Omega e
-     $$
-
+$$
+H = J^\top \Omega J \qquad b = J^\top \Omega e
+$$
+   
    - $\Omega$ is the information (inverse covariance) matrix of the measurement.
 
 4. **Solve**
