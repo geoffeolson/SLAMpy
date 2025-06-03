@@ -1,126 +1,51 @@
-## GitHub Markdown Equation Validators (v1.0)
+## Latex Rule1 Validator (Updated)
 
-This document defines a set of validation rules to detect and correct LaTeX formatting issues in Markdown files intended for GitHub rendering.
-
----
-
-### ✅ Rule 1: Use Double Dollar Signs for Block Equations
-
-**Issue:**
-GitHub Markdown does not render block equations that are surrounded by single dollar signs (`$...$`). Only double dollar signs (`$$...$$`) should be used for block-level LaTeX.
-
-#### 🔍 Validation Procedure
-
-1. **Search for Problem:**
-   - Find any block math delimited by **single** dollar signs on a separate line.
-     ```markdown
-     $
-     x = a + b
-     $
-     ```
-
-2. **Fix the Problem:**
-   - Replace single dollar sign delimiters with double dollar signs:
-     ```markdown
-     $$
-     x = a + b
-     $$
-     ```
+This validator rule ensures that LaTeX equations in a Markdown file use the correct delimiters for GitHub rendering **without introducing unwanted spaces**, and that inline math expressions are **surrounded by appropriate spacing** to separate them from regular text.
 
 ---
 
-### ✅ Rule 7: Avoid Block Equations Inside List Items
+### ✅ Rule 1: Correct LaTeX Delimiters and Spacing
 
-**Issue:**
-Block equations (`$$...$$`) placed inside bullet or numbered list items often break GitHub's Markdown rendering.
+#### 🔍 Validation Logic
 
-#### 🔍 Validation Procedure
+1. **Detect Inline LaTeX:**
+   - Identify LaTeX expressions intended to be inline (on a line with surrounding text).
+   - If the inline math is not wrapped in **single dollar signs (`$...$`)**, replace the incorrect delimiters (e.g., `\(` and `\)`, or others) with `$`.
+   - Ensure there are **no spaces inside the delimiters**.
+   - Ensure there is **at least one space or punctuation mark** separating the math expression from the surrounding text (e.g., `poses $x_i$ and`).
 
-1. **Search for Problem:**
-   - Detect list items followed immediately by a block equation.
-     ```
-     - List item text
-       $$
-       math block
-       $$
-     ```
+   **Example Fix:**
+   ```markdown
+   Incorrect: \( x = y \),poses$x=y$and
+   Correct: poses $x = y$ and
+   ```
 
-2. **Fix the Problem:**
-   - Move the block equation **outside** the list structure.
-     ```
-     - List item text
+2. **Detect Block LaTeX:**
+   - Identify LaTeX expressions intended as display blocks (on their own lines).
+   - If the block math is not wrapped in **double dollar signs (`$$...$$`)**, replace the incorrect delimiters (e.g., `\[ ... \]`, or incorrect single `$`) with `$$`.
+   - Ensure there are **no extra blank lines** within the block.
+   - Ensure there are **no extra spaces before or after** the `$$` delimiters.
 
-       $$
-       math block
-       $$
-     ```
+   **Example Fix:**
+   ```markdown
+   Incorrect:
+   \[
+   x = y + z
+   \]
 
----
+   Correct:
+   $$
+   x = y + z
+   $$
+   ```
 
-### ✅ Rule 10: Avoid Backslash Escape Sequences in Exported Files
+#### 🔧 Summary Fix Procedure
 
-**Issue:**
-Certain escape sequences like `\t`, `\n`, `\b`, `\f`, or `\a` may be misinterpreted during file export or by some text editors, especially Notepad++. This can corrupt LaTeX commands in Markdown documents.
-
-#### 🔍 Validation Procedure
-
-1. **Search for Problem:**
-   - Look for corrupted LaTeX commands like:
-     - `\b egin{bmatrix}` → should be `\begin{bmatrix}`
-     - `\f rac{}` → should be `\frac{}`
-     - `\t imes` → should be `\times`
-     - `\a lpha` → should be `\alpha`
-     - `\a rray` → should be `\array`
-
-2. **Fix the Problem:**
-   - Use search-and-replace to correct the spacing issues:
-     - Replace `\b egin` → `\begin`
-     - Replace `\f rac` → `\frac`
-     - Replace `\t imes` → `\times`
-     - Replace `\a lpha` → `\alpha`
-     - Replace `\a rray` → `\array`
+- Replace `\(` with `$`, and `\)` with `$` for inline math.
+- Replace `\[` with `$$`, and `\]` with `$$` for block math.
+- Replace any **single dollar signs used as block delimiters** (on their own line) with `$$`.
+- Strip spaces **inside** `$...$` and ensure inline math is **surrounded by spaces or punctuation**.
 
 ---
 
-### ✅ Rule 3: Avoid Multiple Subscripts with `\mathbf{}` in a Single Block
-
-**Issue:**
-GitHub Markdown may fail to render equations correctly if `\mathbf{}` is used with multiple indexed variables in the same LaTeX block. This may work once, but repeated uses in the same block often cause rendering failures.
-
-#### 🔍 Validation Procedure
-
-1. **Search for Problem:**
-   - Look for expressions like `\mathbf{e}_{ij}` repeated more than once in the same `$$...$$` block.
-
-2. **Fix the Problem:**
-   - Replace them with a workaround that splits the subscript using a space and backslash:
-     - Replace `\mathbf{e}_{ij}` with `\mathbf{e} \_{ij}`
-
----
-
-### ✅ Rule 4: Avoid Comma-Separated Equations in LaTeX Blocks
-
-**Issue:**
-In GitHub-flavored Markdown, using commas to separate multiple equations within a `$$...$$` block may prevent correct rendering.
-
-#### 🔍 Validation Procedure
-
-1. **Search for Problem:**
-   - Locate lines inside `$$...$$` blocks that contain commas separating equations, like:
-     ```latex
-     $$
-     x = a + b,\quad y = c + d
-     $$
-
-2. **Fix the Problem:**
-   - Break these into separate LaTeX blocks:
-     ```latex
-     $$
-     x = a + b
-     $$
-     $$
-     y = c + d
-     $$
-     ```
-
-✅ These validators are designed to be used together to ensure GitHub-compatible LaTeX in Markdown files. Additional rules can be appended using the same format.
+This validator ensures that GitHub will render all LaTeX equations correctly by using standard `$` and `$$` delimiters for inline and block equations, respectively, **preventing formatting artifacts such as extra spaces inside math blocks or improper spacing around inline expressions**.
