@@ -5,7 +5,7 @@ This document defines **Rule 3** of the Markdown LaTeX validator system. Rule 3 
 
 ---
 
-### ❌ Rule 3: Avoid Multiple Uses of `\mathbf{e}_{ij}` in the Same Math Block
+Rule 3: Avoid `_{ij}`
 
 **Issue:**
 The following pattern renders correctly **once**, but subsequent uses in the same LaTeX block fail:
@@ -20,23 +20,9 @@ This appears to be a GitHub rendering bug, not intended behavior.
 ### ✅ Approved Workaround:
 Use an escaped underscore to bypass the issue:
 ```latex
-\mathbf{e} \_{ij} \quad \mathbf{e} \_{ij}
+\mathbf{e}\_{ij} \quad \Omega{e}\_{ij}
 ```
 GitHub treats this form as valid even when repeated in the same block. It renders the subscript correctly without triggering the bug.
-
----
-
-### 🔍 Detection Pattern (Regex):
-Match the known signature that causes the bug:
-```
-\\mathbf\{e\}_\{ij\}
-```
-
----
-
-### ✅ Summary:
-- Use `\mathbf{e} \_{ij}` instead of `\mathbf{e}_{ij}`
-- This workaround is safe for **multiple uses** in a single equation block
 
 ---
 

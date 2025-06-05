@@ -1,12 +1,10 @@
-## Latex Rule1 Validator (Updated)
+## Latex Validator
 
-This validator rule ensures that LaTeX equations in a Markdown file use the correct delimiters for GitHub rendering **without introducing unwanted spaces**, and that inline math expressions are **surrounded by appropriate spacing** to separate them from regular text.
+This validator ensures that LaTeX equations in a Markdown file use for GitHub will properly rendor equations.
 
 ---
 
-### ✅ Rule 1: Correct LaTeX Delimiters and Spacing
-
-#### 🔍 Validation Logic
+### Rule 1: Inline LaTeX Deliminators
 
 1. **Detect Inline LaTeX:**
    - Identify LaTeX expressions intended to be inline (on a line with surrounding text).
@@ -39,13 +37,3 @@ This validator rule ensures that LaTeX equations in a Markdown file use the corr
    $$
    ```
 
-#### 🔧 Summary Fix Procedure
-
-- Replace `\(` with `$`, and `\)` with `$` for inline math.
-- Replace `\[` with `$$`, and `\]` with `$$` for block math.
-- Replace any **single dollar signs used as block delimiters** (on their own line) with `$$`.
-- Strip spaces **inside** `$...$` and ensure inline math is **surrounded by spaces or punctuation**.
-
----
-
-This validator ensures that GitHub will render all LaTeX equations correctly by using standard `$` and `$$` delimiters for inline and block equations, respectively, **preventing formatting artifacts such as extra spaces inside math blocks or improper spacing around inline expressions**.
