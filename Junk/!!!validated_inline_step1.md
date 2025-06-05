@@ -1,10 +1,6 @@
-## Constructing the Linear System (Rule 1 Fully Fixed)
+## Constructing the Linear System
 
-This section derives the linear system used in Gauss-Newton optimization for Graph-Based SLAM. The goal is to construct the approximate Hessian matrix and the gradient vector from all pairwise constraints:
-
-$$
-H, \quad b
-$$
+This section derives the linear system used in Gauss-Newton optimization for Graph-Based SLAM. The goal is to construct the approximate Hessian matrix $H$ and the gradient vector $b$ from all pairwise constraints.
 
 ---
 
@@ -23,15 +19,15 @@ H \, \delta \mathbf{x} = -b
 $$
 
 Where:
-- The matrix H is the system matrix (approximate Hessian).
-- The vector b is the negative gradient.
+- $H$ is the system matrix (approximate Hessian).
+- $b$ is the system vector (negative gradient).
 - $\delta \mathbf{x}$ is the pose update vector.
 
 ---
 
 ### Contribution from a Single Constraint
 
-For a constraint, let the index pair be written as: $(i, j)$. Then let the Jacobians be:
+For a constraint $(i,j)$, let the Jacobians be:
 
 $$
 J_{ij} = \begin{bmatrix} A_{ij} & B_{ij} \end{bmatrix}
@@ -47,7 +43,7 @@ $$
 b_{ij} = J_{ij}^T \, \Omega_{ij} \, \mathbf{e}_{ij}
 $$
 
-These represent local contributions to the global system. The blocks are added to the matrix H and vector b at the appropriate positions corresponding to poses $\mathbf{x}_i$ and $\mathbf{x}_j$.
+These represent local contributions to the global system. The blocks are added to the matrix $H$ and vector $b$ at the appropriate positions corresponding to poses $\mathbf{x}_i$ and $\mathbf{x}_j$.
 
 ---
 
@@ -72,16 +68,8 @@ $$
 
 ### Notes
 
-The information matrix is defined as:
-
-$$
-\Omega_{ij}
-$$
-
-This is the inverse of the measurement covariance.
-
-Each constraint only affects the sub-blocks of H and b related to poses $i$ and $j$.
-
-The sparsity of H is determined by the connectivity of the pose graph.
+- $\Omega_{ij}$ is the information matrix (inverse of the measurement covariance).
+- Each constraint only affects the sub-blocks of $H$ and $b$ related to poses $i$ and $j$.
+- The sparsity of $H$ is determined by the connectivity of the pose graph.
 
 This system is solved iteratively using sparse linear solvers (e.g., Cholesky decomposition) to refine the pose estimates.
