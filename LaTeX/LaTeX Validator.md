@@ -1,4 +1,6 @@
-﻿# Workflow for LaTeX Validation in Markdown
+
+ 
+ # Workflow for LaTeX Validation in Markdown
 
 We are creating a document that describes a validation workflow for reformatting LaTeX embedded in a Markdown document. The objective is to take a document that renders properly in ChatGPT and reformat it so that it renders correctly on GitHub.
 
@@ -92,6 +94,8 @@ $$
 x = y + z
 $$
 ```
+
+
 
 **Trim Spaces Inside Block Math Delimiters**
 
@@ -250,21 +254,26 @@ S = \begin{bmatrix}
 Each edge in the graph represents a constraint based on a relative pose observation:
 
 \[
-z_{ij} = \begin{bmatrix} \Delta x_{ij} \\ \Delta y_{ij} \\ \Delta \theta_{ij} \end{bmatrix}
-\]
+\mathbf{z}_{ij} = 
+\begin{bmatrix} 
+\Delta\mathbf{x}_{ij} \ \Delta\mathbf{y}_{ij} \\ 
+\Delta y_{ij} \ \Delta\theta_{ij} \end{bmatrix}
+\[
 
 This observation represents the expected transformation from node \( i \) to node \( j \), measured in the coordinate frame of node \( i \).
 
 The predicted relative pose based on current estimates is:
 
 \[
-\hat{z}_{ij} = \begin{bmatrix} R_i^\top (t_j - t_i) \\ \theta_j - \theta_i \end{bmatrix}
+\hat{z}_{ij} = \begin{bmatrix} 
+R_i^\top (t_j - t_i) \\ 
+\theta_j - \theta_i \end{bmatrix}
 \]
 
 The error function is the difference between the observed and predicted relative pose:
 
 \[
-e_{ij} = z_{ij} - \hat{z}_{ij}
+\mathbf{e}_{ij} = \mathbf{z}_{ij} - \hat{z}_{ij}
 \]
 
 This error is used in the least-squares cost function that drives the optimization.
