@@ -67,7 +67,7 @@ $$
 
 Each edge in the graph represents a constraint based on a relative pose observation:
 
-<[! ERROR]>
+<[! ERROR]> The following two LaTeX blocks were interpreted as On block.
 
 $$
 \mathbf{z_{ij}} = 
