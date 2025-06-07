@@ -1,6 +1,3 @@
-# Example LaTeX for Testing
-The follow text has embedded latex that will not properly render GitHub. This document will be used to test the LaTeX validation rules.  After appling the rules, the LaTeX should render correctly in GitHub.
-
 ### Algorithm Summary
 
 1. **Initialization**
@@ -17,11 +14,9 @@ The follow text has embedded latex that will not properly render GitHub. This do
 
    - Use Jacobians to populate the information matrix $H$ and vector $b$:
 
-     
 $$
 H = J^\top \Omega J \qquad b = J^\top \Omega e
 $$
-
 
    - $\Omega$ is the information (inverse covariance) matrix of the measurement.
 
@@ -36,24 +31,19 @@ $$
 
 ### Pose Definitions
 
-
 $$
 x_i = \begin{bmatrix} x_i \\ y_i \\ \theta_i \end{bmatrix}, \quad
 x_j = \begin{bmatrix} x_j \\ y_j \\ \theta_j \end{bmatrix}, \quad
 \Delta t = \begin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
 $$
 
-
 Let the rotation matrix of pose $x_i$ be:
-
 
 $$
 R_i \in \mathbb{R}^{2 \times 2}
 $$
 
-
 and define the skew-symmetric matrix:
-
 
 $$
 S = \begin{bmatrix}
@@ -62,45 +52,40 @@ S = \begin{bmatrix}
 \end{bmatrix}
 $$
 
-
 ### Error Function and Observations
 
 Each edge in the graph represents a constraint based on a relative pose observation:
 
-<[! ERROR]> The following two LaTeX blocks were interpreted as On block.
-
 $$
-\mathbf{z_{ij}} = 
-\begin{bmatrix} 
-\Delta\mathbf{x_{ij}} \ \Delta\mathbf{y_{ij}} \\ 
-\Delta y_{ij} \ \Delta\theta_{ij} \end{bmatrix}
-\[  
+\mathbf{z_{ij}} =
+\begin{bmatrix}
+\Delta\mathbf{x}_{ij} \ \Delta\mathbf{y}_{ij} \\  <[Error]>mathbf{x}_{ij} and mathbf{y}_{ij} were not fixed
+\Delta y_{ij} \ \Delta\theta_{ij}
+\end{bmatrix}
+$$
 
 This observation represents the expected transformation from node $i$ to node $j$, measured in the coordinate frame of node $i$.
 
 The predicted relative pose based on current estimates is:
 
-\[
-\hat{z_{ij}} = \begin{bmatrix} 
-R_i^\top (t_j - t_i) \\ 
-\theta_j - \theta_i \end{bmatrix}
 $$
-
+\hat{z}_{ij} = \begin{bmatrix}
+R_i^\top (t_j - t_i) \\
+\theta_j - \theta_i
+\end{bmatrix}
+$$
 
 The error function is the difference between the observed and predicted relative pose:
 
-
 $$
-\mathbf{e_{ij}} = \mathbf{z_{ij}} - \hat{z_{ij}}
+\mathbf{e_{ij}} = \mathbf{z_{ij}} - \hat{z}_{ij}
 $$
-
 
 This error is used in the least-squares cost function that drives the optimization.
 
 ### Jacobians
 
 The Jacobians of this function are with respect to the two involved poses $x_i$ and $x_j$.
-
 
 $$
 A_{ij} =
@@ -110,8 +95,6 @@ A_{ij} =
 \end{bmatrix}
 $$
 
-
-
 $$
 B_{ij} =
 \begin{bmatrix}
@@ -120,13 +103,8 @@ R_i^\top & 0_{2 \times 1} \\
 \end{bmatrix}
 $$
 
-
 ### Summary
 
 - These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.
 - The rotation matrix $R_i^\top$ transforms global coordinates to local frame $i$.
 - The skew-symmetric matrix $S$ arises from the derivative of a rotation operation.
-
----
-<br><br><br><br>
-
