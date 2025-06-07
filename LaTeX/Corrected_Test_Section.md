@@ -67,7 +67,7 @@ $$
 
 Each edge in the graph represents a constraint based on a relative pose observation:
 
-[! ERROR] 
+<[! ERROR]>
 
 $$
 \mathbf{z_{ij}} = 
