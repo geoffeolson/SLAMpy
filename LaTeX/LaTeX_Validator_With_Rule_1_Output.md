@@ -308,3 +308,16 @@ R_i^\top & 0_{2 \times 1} \\
 ---
 <br><br><br><br>
 
+
+
+## Test Output: Rule 1 — Inline LaTeX Delimiters
+
+This section shows the result of applying Rule 1 (Inline LaTeX Delimiters) to the test input.
+
+We convert `\( ... \)` or similar forms to `$...$`, and remove spaces inside the delimiters.
+
+**Example Fixes:**
+
+- `\( x + y \)` becomes `$x + y$`
+- `$ x + y $` becomes `$x + y$`
+
