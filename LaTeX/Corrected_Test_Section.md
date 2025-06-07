@@ -67,13 +67,14 @@ $$
 
 Each edge in the graph represents a constraint based on a relative pose observation:
 
+[! ERROR] 
 
 $$
 \mathbf{z_{ij}} = 
 \begin{bmatrix} 
 \Delta\mathbf{x_{ij}} \ \Delta\mathbf{y_{ij}} \\ 
 \Delta y_{ij} \ \Delta\theta_{ij} \end{bmatrix}
-\[
+\[  
 
 This observation represents the expected transformation from node $i$ to node $j$, measured in the coordinate frame of node $i$.
 
