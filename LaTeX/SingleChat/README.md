@@ -32,9 +32,22 @@
 ### Pose Definitions
 
 \[
-x_i = \begin{bmatrix} x_i \\ y_i \\ \theta_i \end{bmatrix}, \quad
-x_j = \begin{bmatrix} x_j \\ y_j \\ \theta_j \end{bmatrix}, \quad
-\Delta t = \begin{bmatrix} x_j - x_i \\ y_j - y_i \end{bmatrix}
+x_i = \begin{bmatrix} 
+x_i \\ 
+y_i \\ 
+\theta_i 
+\end{bmatrix},
+\quad
+x_j = \begin{bmatrix} 
+x_j \\ 
+y_j \\ 
+\theta_j 
+\end{bmatrix}, 
+\quad
+\Delta t = \begin{bmatrix} 
+x_j - x_i \\ 
+y_j - y_i 
+\end{bmatrix}
 \]
 
 Let the rotation matrix of pose \( x_i \) be:
@@ -59,8 +72,9 @@ Each edge in the graph represents a constraint based on a relative pose observat
 \[
 \mathbf{z}_{ij} = 
 \begin{bmatrix} 
-\Delta\mathbf{x}_{ij} \ \Delta\mathbf{y}_{ij} \\ 
-\Delta y_{ij} \ \Delta\theta_{ij} \end{bmatrix}
+\Delta\mathbf{x}_{ij} & \Delta\mathbf{y}_{ij} \\ 
+\Delta y_{ij} & \Delta\theta_{ij} 
+\end{bmatrix}
 \]
 
 This observation represents the expected transformation from node \( i \) to node \( j \), measured in the coordinate frame of node \( i \).
@@ -70,7 +84,8 @@ The predicted relative pose based on current estimates is:
 \[
 \hat{z}_{ij} = \begin{bmatrix} 
 R_i^\top (t_j - t_i) \\ 
-\theta_j - \theta_i \end{bmatrix}
+\theta_j - \theta_i 
+\end{bmatrix}
 \]
 
 The error function is the difference between the observed and predicted relative pose:
