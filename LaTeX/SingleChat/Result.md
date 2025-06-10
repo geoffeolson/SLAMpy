@@ -8,7 +8,7 @@
 2. **Linearization**
 
    - For each constraint (edge), compute the error between the predicted and observed relative pose.
-   - Linearize the error function using Jacobians $A_{ij}$ and $B_{ij}$ with respect to the involved poses $x_i$ and $x_j$.
+   - Linearize the error function using Jacobians $A\_{ij}$ and $B\_{ij}$ with respect to the involved poses $x\_i$ and $x\_j$.
 
 3. **Construct System**
 
@@ -16,7 +16,8 @@
      $$
      H = J^\top \Omega J \qquad b = J^\top \Omega e
      $$
-   - $ \Omega $ is the information (inverse covariance) matrix of the measurement.
+
+   - $\Omega$ is the information (inverse covariance) matrix of the measurement.
 
 4. **Solve**
 
@@ -30,28 +31,28 @@
 ### Pose Definitions
 
 $$
-x_i = \begin{bmatrix} 
-x_i \\ 
-y_i \\ 
-\theta_i 
+x\_i = \begin{bmatrix}
+x\_i \\
+y\_i \\
+\theta\_i
 \end{bmatrix},
 \quad
-x_j = \begin{bmatrix} 
-x_j \\ 
-y_j \\ 
-\theta_j 
-\end{bmatrix}, 
+x\_j = \begin{bmatrix}
+x\_j \\
+y\_j \\
+\theta\_j
+\end{bmatrix},
 \quad
-\Delta t = \begin{bmatrix} 
-x_j - x_i \\ 
-y_j - y_i 
+\Delta t = \begin{bmatrix}
+x\_j - x\_i \\
+y\_j - y\_i
 \end{bmatrix}
 $$
 
-Let the rotation matrix of pose $x_i$ be:
+Let the rotation matrix of pose $x\_i$ be:
 
 $$
-R_i \in \mathbb{R}^{2 \times 2}
+R\_i \in \mathbb{R}^{2 \times 2}
 $$
 
 and define the skew-symmetric matrix:
@@ -68,10 +69,10 @@ $$
 Each edge in the graph represents a constraint based on a relative pose observation:
 
 $$
-\mathbf{z}\_{ij} = 
-\begin{bmatrix} 
-\Delta\mathbf{x}\_{ij} & \Delta\mathbf{y}\_{ij} \\ 
-\Delta y\_{ij} & \Delta\theta\_{ij} 
+\mathbf{z}\_{ij} =
+\begin{bmatrix}
+\Delta\mathbf{x}\_{ij} & \Delta\mathbf{y}\_{ij} \\
+\Delta y\_{ij} & \Delta\theta\_{ij}
 \end{bmatrix}
 $$
 
@@ -80,9 +81,9 @@ This observation represents the expected transformation from node $i$ to node $j
 The predicted relative pose based on current estimates is:
 
 $$
-\hat{z}\_{ij} = \begin{bmatrix} 
-R_i^\top (t_j - t_i) \\ 
-\theta_j - \theta_i 
+\hat{z}\_{ij} = \begin{bmatrix}
+R\_i^\top (t\_j - t\_i) \\
+\theta\_j - \theta\_i
 \end{bmatrix}
 $$
 
@@ -96,12 +97,12 @@ This error is used in the least-squares cost function that drives the optimizati
 
 ### Jacobians
 
-The Jacobians of this function are with respect to the two involved poses $x_i$ and $x_j$.
+The Jacobians of this function are with respect to the two involved poses $x\_i$ and $x\_j$.
 
 $$
 A\_{ij} =
 \begin{bmatrix}
--R_i^\top & R_i^\top S \Delta t \\
+-R\_i^\top & R\_i^\top S \Delta t \\
 0\_{1 \times 2} & -1
 \end{bmatrix}
 $$
@@ -109,7 +110,7 @@ $$
 $$
 B\_{ij} =
 \begin{bmatrix}
-R_i^\top & 0\_{2 \times 1} \\
+R\_i^\top & 0\_{2 \times 1} \\
 0\_{1 \times 2} & 1
 \end{bmatrix}
 $$
@@ -117,5 +118,5 @@ $$
 ### Summary
 
 - These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.
-- The rotation matrix $R_i^\top$ transforms global coordinates to local frame $i$.
+- The rotation matrix $R\_i^\top$ transforms global coordinates to local frame $i$.
 - The skew-symmetric matrix $S$ arises from the derivative of a rotation operation.

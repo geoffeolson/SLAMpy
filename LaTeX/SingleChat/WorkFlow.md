@@ -62,6 +62,9 @@ $$
 Incorrect: $$ x + y $$  
 Correct: $$x + y$$
 
+Incorrect: - $ \Omega $ is  
+Correct: - $\Omega$ is
+
 **Implementation Note:**  
 Trim both leading/trailing spaces and newlines from the expression before wrapping it in `$$...$$`. This avoids rendering issues in GitHub Markdown.
 
