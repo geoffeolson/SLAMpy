@@ -1,4 +1,11 @@
-Please show the uploaded document in a chat code block
+# To Do
+1. Add a good testa for subscript problem
+2. Fix the LaTeX issues in the example like maing sure matrix rows are in seperate lines
+3. Think of a way to combine the rules into a single rule set. after each rule the output can be saved to a code block, and then read in from the code block for the next rule.
+
+### Rule 0: Upload Document
+
+Show the uploaded document in a chat code block
 
 ### Rule 1: Inline LaTeX Delimiters
 
