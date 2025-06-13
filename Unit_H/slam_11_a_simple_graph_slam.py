@@ -64,6 +64,52 @@ class GraphSLAM:
         error[2] = (error[2] + np.pi) % (2 * np.pi) - np.pi
         return error
 
+    def compute_jacobians(xi, xj):
+        """
+        Compute Jacobians A_ij and B_ij for the relative pose constraint between xi and xj.
+
+        Parameters:
+        xi : ndarray (3,) - pose i [x_i, y_i, theta_i]
+        xj : ndarray (3,) - pose j [x_j, y_j, theta_j]
+
+        Returns:
+        A_ij : ndarray (3, 3)
+        B_ij : ndarray (3, 3)
+        """
+        # Extract values
+        xi_x, xi_y, xi_theta = xi
+        xj_x, xj_y, xj_theta = xj
+
+        # Compute delta t
+        delta_t = np.array([xj_x - xi_x, xj_y - xi_y])
+
+        # Rotation matrix Ri and its transpose
+        cos_theta = np.cos(xi_theta)
+        sin_theta = np.sin(xi_theta)
+        Ri = np.array([[cos_theta, -sin_theta],
+                        [sin_theta,  cos_theta]])
+        Ri_T = Ri.T
+
+        # Skew-symmetric matrix S
+        S = np.array([[0, -1],
+                        [1,  0]])
+
+        # Compute blocks for A_ij
+        A_pos = -Ri_T
+        A_theta = Ri_T @ S @ delta_t
+        A_ij = np.zeros((3, 3))
+        A_ij[0:2, 0:2] = A_pos
+        A_ij[0:2, 2] = A_theta
+        A_ij[2, 2] = -1
+
+        # Compute blocks for B_ij
+        B_ij = np.zeros((3, 3))
+        B_ij[0:2, 0:2] = Ri_T
+        B_ij[2, 2] = 1
+
+        return A_ij, B_ij
+
+
     def print_summary(self):
         print("Poses:")
         for idx, p in enumerate(self.poses):
@@ -78,6 +124,8 @@ class GraphSLAM:
             e_ij = self.compute_error(constraint)
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
+
+
 
 
 if __name__ == '__main__':
