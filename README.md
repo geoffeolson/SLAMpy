@@ -133,6 +133,94 @@ $$
 
 ---
 
+## 6. Linear System Construction
+
+We now describe how to build the linear system for optimization, following the Gauss-Newton method.
+
+At each iteration, we linearize the error function around the current estimate and solve:
+
+$$
+H \Delta x = -b
+$$
+
+where:
+
+- $\Delta x$ is the update vector for all poses.
+- $H$ is the system matrix (information matrix).
+- $b$ is the right-hand-side vector.
+
+---
+
+### 6.1 Contribution from Each Constraint
+
+For each constraint $(i, j, z\_{ij}, \Omega\_{ij})$, we compute:
+
+- The error:
+$$
+e\_{ij} = z\_{ij} - \hat{z}\_{ij}
+$$
+- The Jacobians:
+$$
+A\_{ij} = \frac{\partial e\_{ij}}{\partial x\_i}, \quad B\_{ij} = \frac{\partial e\_{ij}}{\partial x\_j}
+$$
+
+The contribution of this constraint to the linear system is:
+
+$$
+H\_{ii} += A\_{ij}^\top \Omega\_{ij} A\_{ij}
+$$
+
+$$
+H\_{ij} += A\_{ij}^\top \Omega\_{ij} B\_{ij}
+$$
+
+$$
+H\_{ji} += B\_{ij}^\top \Omega\_{ij} A\_{ij}
+$$
+
+$$
+H\_{jj} += B\_{ij}^\top \Omega\_{ij} B\_{ij}
+$$
+
+and
+
+$$
+b\_i += A\_{ij}^\top \Omega\_{ij} e\_{ij}
+$$
+
+$$
+b\_j += B\_{ij}^\top \Omega\_{ij} e\_{ij}
+$$
+
+---
+
+### 6.2 Global Assembly
+
+We initialize:
+
+- $H$ as a zero matrix of size $3N \times 3N$ where $N$ is the number of poses.
+- $b$ as a zero vector of size $3N$.
+
+For each constraint, the corresponding blocks of $H$ and $b$ are updated at the appropriate positions:
+
+- Pose $i$ corresponds to block index $3i : 3i+3$.
+- Pose $j$ corresponds to block index $3j : 3j+3$.
+
+The full system accumulates all contributions from all constraints.
+
+---
+
+### 6.3 Notes
+
+- $\Omega\_{ij}$ is the information matrix of the constraint (usually diagonal).
+- The structure of $H$ remains sparse because each constraint only affects two poses.
+- After building $H$ and $b$, we solve:
+$$
+H \Delta x = -b
+$$
+using sparse linear solvers (e.g. Cholesky).
+
+
 ### Summary
 
 - These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.

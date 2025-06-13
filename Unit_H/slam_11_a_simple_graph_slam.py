@@ -125,6 +125,74 @@ class GraphSLAM:
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
 
+def test_jacobians():
+    """
+    Unit test: Compare analytical and numerical Jacobians.
+    """
+
+    eps = 1e-6  # small perturbation for finite difference
+
+    # Example poses (arbitrary but reasonable values)
+    xi = np.array([1.0, 2.0, 30 * np.pi / 180])  # Pose i: x, y, theta
+    xj = np.array([2.5, 3.0, 40 * np.pi / 180])  # Pose j: x, y, theta
+
+    # Fake observation (not used for Jacobian test)
+    z_ij = np.array([0.0, 0.0, 0.0])
+    Omega_ij = np.eye(3)
+
+    # Build artificial constraint to reuse existing error function
+    gs = GraphSLAM()
+    gs.add_pose(xi)
+    gs.add_pose(xj)
+    constraint = (0, 1, z_ij, Omega_ij)
+
+    # Compute baseline error
+    e0 = gs.compute_error(constraint)
+
+    # Compute analytical Jacobians
+    A_analytic, B_analytic = GraphSLAM.compute_jacobians(xi, xj)
+
+    # Numerical Jacobian for xi (A_ij)
+    A_numeric = np.zeros((3, 3))
+    for k in range(3):
+        xi_perturbed = xi.copy()
+        xi_perturbed[k] += eps
+        gs.poses[0] = xi_perturbed  # update pose i
+        e_perturbed = gs.compute_error(constraint)
+        A_numeric[:, k] = (e_perturbed - e0) / eps
+        gs.poses[0] = xi  # restore
+
+    # Numerical Jacobian for xj (B_ij)
+    B_numeric = np.zeros((3, 3))
+    for k in range(3):
+        xj_perturbed = xj.copy()
+        xj_perturbed[k] += eps
+        gs.poses[1] = xj_perturbed  # update pose j
+        e_perturbed = gs.compute_error(constraint)
+        B_numeric[:, k] = (e_perturbed - e0) / eps
+        gs.poses[1] = xj  # restore
+
+        # Flip numerical Jacobians for sign convention
+        A_numeric_flipped = -A_numeric
+        B_numeric_flipped = -B_numeric
+
+        # Compare results after flipping
+        print("Analytical A_ij:")
+        print(A_analytic)
+        print("Numerical A_ij (flipped):")
+        print(A_numeric_flipped)
+        print("Difference A:")
+        print(A_analytic - A_numeric_flipped)
+        print()
+
+        print("Analytical B_ij:")
+        print(B_analytic)
+        print("Numerical B_ij (flipped):")
+        print(B_numeric_flipped)
+        print("Difference B:")
+        print(B_analytic - B_numeric_flipped)
+
+
 
 
 
@@ -151,6 +219,7 @@ if __name__ == '__main__':
     gs.add_constraint(1, 2, z_ij, Omega_ij)
 
     #print Results
+    print("\n*****GRAPH SLAM OBJECT TEST******")
     gs.print_summary()
 
     # Expected Output:
@@ -164,3 +233,5 @@ if __name__ == '__main__':
     # Error:
     #   x1 → x2 : [-0.1  0.1  5.0 ]
     #   x1 → x2 : [ 0.1 -0.1  0.0 ]
+    print("\n\n***********JACOBIAN TEST****************")
+    test_jacobians()
