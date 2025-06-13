@@ -137,11 +137,8 @@ $$
 
 We now describe how to build the linear system for optimization, following the Gauss-Newton method.
 
-At each iteration, we linearize the error function around the current estimate and solve:
-
-$$
-H \Delta x = -b
-$$
+At each iteration, we linearize the error function around the current estimate and solve:  
+$H \Delta x = -b$
 
 where:
 
@@ -155,42 +152,17 @@ where:
 
 For each constraint $(i, j, z\_{ij}, \Omega\_{ij})$, we compute:
 
-- The error:
-$$
-e\_{ij} = z\_{ij} - \hat{z}\_{ij}
-$$
-- The Jacobians:
-$$
-A\_{ij} = \frac{\partial e\_{ij}}{\partial x\_i}, \quad B\_{ij} = \frac{\partial e\_{ij}}{\partial x\_j}
-$$
+- The error: $e\_{ij} = z\_{ij} - \hat{z}\_{ij}$
+- The Jacobians: $A\_{ij} = \frac{\partial e\_{ij}}{\partial x\_i}, \quad B\_{ij} = \frac{\partial e\_{ij}}{\partial x\_j}$
 
 The contribution of this constraint to the linear system is:
 
-$$
-H\_{ii} += A\_{ij}^\top \Omega\_{ij} A\_{ij}
-$$
-
-$$
-H\_{ij} += A\_{ij}^\top \Omega\_{ij} B\_{ij}
-$$
-
-$$
-H\_{ji} += B\_{ij}^\top \Omega\_{ij} A\_{ij}
-$$
-
-$$
-H\_{jj} += B\_{ij}^\top \Omega\_{ij} B\_{ij}
-$$
-
-and
-
-$$
-b\_i += A\_{ij}^\top \Omega\_{ij} e\_{ij}
-$$
-
-$$
-b\_j += B\_{ij}^\top \Omega\_{ij} e\_{ij}
-$$
+- $H\_{ii} += A\_{ij}^\top \Omega\_{ij} A\_{ij}$
+- $H\_{ij} += A\_{ij}^\top \Omega\_{ij} B\_{ij}$
+- $H\_{ji} += B\_{ij}^\top \Omega\_{ij} A\_{ij}$
+- $H\_{jj} += B\_{ij}^\top \Omega\_{ij} B\_{ij}$
+- $b\_i += A\_{ij}^\top \Omega\_{ij} e\_{ij}$
+- $b\_j += B\_{ij}^\top \Omega\_{ij} e\_{ij}$
 
 ---
 
@@ -214,11 +186,7 @@ The full system accumulates all contributions from all constraints.
 
 - $\Omega\_{ij}$ is the information matrix of the constraint (usually diagonal).
 - The structure of $H$ remains sparse because each constraint only affects two poses.
-- After building $H$ and $b$, we solve:
-$$
-H \Delta x = -b
-$$
-using sparse linear solvers (e.g. Cholesky).
+- After building $H$ and $b$, we solve: $H \Delta x = -b$ using sparse linear solvers (e.g. Cholesky).
 
 
 ### Summary
