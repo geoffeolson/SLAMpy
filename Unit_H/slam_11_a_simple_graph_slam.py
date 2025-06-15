@@ -125,6 +125,46 @@ class GraphSLAM:
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
 
+def test_object_creation():
+    """
+    Unit test: Create Object and Test.
+     Expected Output:
+         Poses:
+       x0 = [0.0 0.0 0.0]
+       x1 = [1.0 0.0 0.0]
+       x2 = [2.0 0.0 0.0]
+     Constraints:
+       x0 → x1 : [ 0.9  0.1  5.0 ]
+       x1 → x2 : [ 1.1 -0.1  0.0 ]
+     Error:
+       x1 → x2 : [-0.1  0.1  5.0 ]
+       x1 → x2 : [ 0.1 -0.1  0.0 ]
+    """
+    # create Graph Slam object
+    gs = GraphSLAM()
+
+    #Add Poses
+    x0 = [0.0, 0.0, 0.0]   # origin
+    x1 = [1.0, 0.0, 0.0]   # 1 meter forward
+    x2 = [2.0, 0.0, 0.0]   # 2 meter forward
+
+    gs.add_pose(x0)
+    gs.add_pose(x1)
+    gs.add_pose(x2)
+
+    #Add constraint
+    z_ij = [0.9, 0.1, 5 * pi / 180]
+    Omega_ij = np.diag([1.0, 1.0, 1.0])
+    gs.add_constraint(0, 1, z_ij, Omega_ij)
+
+    z_ij = [1.1, -0.1, 0.0]
+    Omega_ij = np.diag([1.0, 1.0, 1.0])
+    gs.add_constraint(1, 2, z_ij, Omega_ij)
+
+    #print Results
+    print("\n*****GRAPH SLAM OBJECT TEST******")
+    gs.print_summary()
+
 def test_jacobians():
     """
     Unit test: Compare analytical and numerical Jacobians.
@@ -197,41 +237,44 @@ def test_jacobians():
 
 
 if __name__ == '__main__':
-    # create Graph Slam object
-    gs = GraphSLAM()
+    # # create Graph Slam object
+    # gs = GraphSLAM()
 
-    #Add Poses
-    x0 = [0.0, 0.0, 0.0]   # origin
-    x1 = [1.0, 0.0, 0.0]   # 1 meter forward
-    x2 = [2.0, 0.0, 0.0]   # 2 meter forward
+    # #Add Poses
+    # x0 = [0.0, 0.0, 0.0]   # origin
+    # x1 = [1.0, 0.0, 0.0]   # 1 meter forward
+    # x2 = [2.0, 0.0, 0.0]   # 2 meter forward
 
-    gs.add_pose(x0)
-    gs.add_pose(x1)
-    gs.add_pose(x2)
+    # gs.add_pose(x0)
+    # gs.add_pose(x1)
+    # gs.add_pose(x2)
 
-    #Add constraint
-    z_ij = [0.9, 0.1, 5 * pi / 180]
-    Omega_ij = np.diag([1.0, 1.0, 1.0])
-    gs.add_constraint(0, 1, z_ij, Omega_ij)
+    # #Add constraint
+    # z_ij = [0.9, 0.1, 5 * pi / 180]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(0, 1, z_ij, Omega_ij)
 
-    z_ij = [1.1, -0.1, 0.0]
-    Omega_ij = np.diag([1.0, 1.0, 1.0])
-    gs.add_constraint(1, 2, z_ij, Omega_ij)
+    # z_ij = [1.1, -0.1, 0.0]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(1, 2, z_ij, Omega_ij)
 
-    #print Results
+    # #print Results
+    # gs.print_summary()
+
+
+    # # Expected Output:
+    # #     Poses:
+    # #   x0 = [0.0 0.0 0.0]
+    # #   x1 = [1.0 0.0 0.0]
+    # #   x2 = [2.0 0.0 0.0]
+    # # Constraints:
+    # #   x0 → x1 : [ 0.9  0.1  5.0 ]
+    # #   x1 → x2 : [ 1.1 -0.1  0.0 ]
+    # # Error:
+    # #   x1 → x2 : [-0.1  0.1  5.0 ]
+    # #   x1 → x2 : [ 0.1 -0.1  0.0 ]
+    
     print("\n*****GRAPH SLAM OBJECT TEST******")
-    gs.print_summary()
-
-    # Expected Output:
-    #     Poses:
-    #   x0 = [0.0 0.0 0.0]
-    #   x1 = [1.0 0.0 0.0]
-    #   x2 = [2.0 0.0 0.0]
-    # Constraints:
-    #   x0 → x1 : [ 0.9  0.1  5.0 ]
-    #   x1 → x2 : [ 1.1 -0.1  0.0 ]
-    # Error:
-    #   x1 → x2 : [-0.1  0.1  5.0 ]
-    #   x1 → x2 : [ 0.1 -0.1  0.0 ]
+    test_object_creation()
     print("\n\n***********JACOBIAN TEST****************")
     test_jacobians()
