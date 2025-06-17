@@ -131,6 +131,12 @@ R_i^\top & 0_{2 \times 1} \\
 \end{bmatrix}
 $$
 
+### Summary
+
+- These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.
+- The rotation matrix $R_i^\top$ transforms global coordinates to local frame $i$.
+- The skew-symmetric matrix $S$ arises from the derivative of a rotation operation.
+
 ---
 
 ## 6. Linear System Construction
@@ -188,9 +194,84 @@ The full system accumulates all contributions from all constraints.
 - The structure of $H$ remains sparse because each constraint only affects two poses.
 - After building $H$ and $b$, we solve: $H \Delta x = -b$ using sparse linear solvers (e.g. Cholesky).
 
+---
 
-### Summary
+## 7. Solving the Linear System
 
-- These Jacobians are used to populate the sparse system matrix $H$ and vector $b$ in SLAM optimization.
-- The rotation matrix $R_i^\top$ transforms global coordinates to local frame $i$.
-- The skew-symmetric matrix $S$ arises from the derivative of a rotation operation.
+Once the linear system $H \Delta x = -b$ is constructed, we solve for the pose update $\Delta x$.
+
+### 7.1 Gauge Freedom
+
+The SLAM problem has gauge freedom — it is underdetermined because the full trajectory can be translated and rotated without affecting relative measurements.  
+To eliminate this ambiguity, we fix one pose (typically the first pose $x_0$) to an arbitrary value. This is called **anchoring**.
+
+We apply this constraint directly to the linear system by modifying $H$ and $b$:
+
+- Set rows and columns corresponding to pose $x_0$ to identity:
+
+$$
+H\_{0:3, 0:3} = I\_{3 \times 3}
+$$
+
+- Set the corresponding entries in $b$ to zero:
+
+$$
+b\_{0:3} = 0
+$$
+
+This pins the first pose to its initial estimate.
+
+---
+
+### 7.2 Solving the Linear System
+
+After anchoring, we solve the linear system:
+
+$$
+H \Delta x = -b
+$$
+
+The update step is:
+
+$$
+\Delta x = - H^{-1} b
+$$
+
+In practice, $H$ is sparse and symmetric positive definite, so we use sparse solvers such as Cholesky factorization to efficiently compute $\Delta x$.
+
+---
+
+### 7.3 Applying the Pose Updates
+
+Once the increment $\Delta x$ is computed, we apply it to update the poses:
+
+For each pose $x_i$:
+
+$$
+x_i \leftarrow x_i + \Delta x_i
+$$
+
+where $\Delta x_i$ is the corresponding 3-element subvector extracted from $\Delta x$:
+
+- Pose $i$ corresponds to indices:
+
+$$
+\Delta x_i = \Delta x\_{3i : 3i+3}
+$$
+
+The updated poses are then used in the next Gauss-Newton iteration.
+
+---
+
+### 7.4 Convergence Criteria
+
+We iterate:
+
+1. Build $H$ and $b$ from current estimates.
+2. Solve $H \Delta x = -b$.
+3. Apply pose updates.
+
+Until one of the following is satisfied:
+
+- The norm of $\Delta x$ becomes sufficiently small.
+- The maximum number of iterations is reached.
