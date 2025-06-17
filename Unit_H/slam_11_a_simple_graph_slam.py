@@ -109,6 +109,51 @@ class GraphSLAM:
 
         return A_ij, B_ij
 
+    def build_linear_system(self):
+        """
+        Build the linear system H and b for Graph-Based SLAM.
+        Follows directly from the derivation in the README.md
+        """
+
+        N = len(self.poses)
+        H = np.zeros((3 * N, 3 * N))
+        b = np.zeros((3 * N, ))
+
+        for constraint in self.constraints:
+            i, j, z_ij, Omega_ij = constraint
+
+            # Get current poses
+            xi = self.poses[i]
+            xj = self.poses[j]
+
+            # Compute error and Jacobians
+            e_ij = self.compute_error(constraint)
+            A_ij, B_ij = GraphSLAM.compute_jacobians(xi, xj)
+
+            # Compute blocks for H
+            H_ii = A_ij.T @ Omega_ij @ A_ij
+            H_ij = A_ij.T @ Omega_ij @ B_ij
+            H_ji = B_ij.T @ Omega_ij @ A_ij
+            H_jj = B_ij.T @ Omega_ij @ B_ij
+
+            # Compute blocks for b
+            b_i = A_ij.T @ Omega_ij @ e_ij
+            b_j = B_ij.T @ Omega_ij @ e_ij
+
+            # Assemble into global H and b
+            i_idx = slice(3 * i, 3 * i + 3)
+            j_idx = slice(3 * j, 3 * j + 3)
+
+            H[i_idx, i_idx] += H_ii
+            H[i_idx, j_idx] += H_ij
+            H[j_idx, i_idx] += H_ji
+            H[j_idx, j_idx] += H_jj
+
+            b[i_idx] += b_i
+            b[j_idx] += b_j
+
+        return H, b
+
 
     def print_summary(self):
         print("Poses:")
@@ -124,6 +169,8 @@ class GraphSLAM:
             e_ij = self.compute_error(constraint)
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
+
+
 
 def test_object_creation():
     """
