@@ -154,6 +154,43 @@ class GraphSLAM:
 
         return H, b
 
+    def solve(self, max_iterations=10, tol=1e-4):
+        """
+        Gauss-Newton optimizer for Graph-Based SLAM.
+        Follows the full system described in README.md.
+        """
+
+    N = len(self.poses)
+
+    for iteration in range(max_iterations):
+        print(f"\nIteration {iteration+1}")
+
+        # Build linear system
+        H, b = self.build_linear_system()
+
+        # Apply gauge fixing (anchor first pose)
+        H[0:3, :] = 0
+        H[:, 0:3] = 0
+        H[0:3, 0:3] = np.eye(3)
+        b[0:3] = 0
+
+        # Solve the system: H Δx = -b
+        delta_x = np.linalg.solve(H, -b)
+
+        # Apply updates to poses
+        for i in range(N):
+            idx = slice(3 * i, 3 * i + 3)
+            dx_i = delta_x[idx]
+            self.poses[i] += dx_i
+
+        # Check for convergence
+        norm_dx = np.linalg.norm(delta_x)
+        print(f"  Norm of delta_x: {norm_dx:.6f}")
+        if norm_dx < tol:
+            print("Converged.")
+            break
+
+
     def print_summary(self):
         print("Poses:")
         for idx, p in enumerate(self.poses):
