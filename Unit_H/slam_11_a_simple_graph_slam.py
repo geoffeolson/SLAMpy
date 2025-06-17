@@ -154,7 +154,6 @@ class GraphSLAM:
 
         return H, b
 
-
     def print_summary(self):
         print("Poses:")
         for idx, p in enumerate(self.poses):
@@ -169,8 +168,6 @@ class GraphSLAM:
             e_ij = self.compute_error(constraint)
             e_ij[2] = e_ij[2] * 180 / pi
             print(f"  x{i} → x{j} : {e_ij}")
-
-
 
 def test_object_creation():
     """
@@ -211,75 +208,7 @@ def test_object_creation():
     #print Results
     gs.print_summary()
 
-def test_jacobians():
-    """
-    Unit test: Compare analytical and numerical Jacobians.
-    """
-
-    delta_x = 1e-6  # small perturbation for finite difference
-
-    # Example poses (arbitrary but reasonable values)
-    xi = np.array([1.0, 2.0, 30 * np.pi / 180])  # Pose i: x, y, theta
-    xj = np.array([2.5, 3.0, 40 * np.pi / 180])  # Pose j: x, y, theta
-
-    # Fake observation (not used for Jacobian test)
-    z_ij = np.array([0.0, 0.0, 0.0])
-    Omega_ij = np.eye(3)
-
-    # Build artificial constraint to reuse existing error function
-    gs = GraphSLAM()
-    gs.add_pose(xi)
-    gs.add_pose(xj)
-    constraint = (0, 1, z_ij, Omega_ij)
-
-    # Compute baseline error
-    e0 = gs.compute_error(constraint)
-
-    # Compute analytical Jacobians
-    A_analytic, B_analytic = GraphSLAM.compute_jacobians(xi, xj)
-
-    # Numerical Jacobian for xi (A_ij)
-    A_numeric = np.zeros((3, 3))
-    for k in range(3):
-        xi_perturbed = xi.copy()
-        xi_perturbed[k] += delta_x
-        gs.poses[0] = xi_perturbed  # update pose i
-        e_perturbed = gs.compute_error(constraint)
-        A_numeric[:, k] = (e_perturbed - e0) / delta_x
-        gs.poses[0] = xi  # restore
-
-    # Numerical Jacobian for xj (B_ij)
-    B_numeric = np.zeros((3, 3))
-    for k in range(3):
-        xj_perturbed = xj.copy()
-        xj_perturbed[k] += delta_x
-        gs.poses[1] = xj_perturbed  # update pose j
-        e_perturbed = gs.compute_error(constraint)
-        B_numeric[:, k] = (e_perturbed - e0) / delta_x
-        gs.poses[1] = xj  # restore
-
-        # Flip numerical Jacobians for sign convention
-        A_numeric_flipped = -A_numeric
-        B_numeric_flipped = -B_numeric
-
-        # Compare results after flipping
-        
-    print("\n\n******A*********")
-    print("Analytical A_ij:")
-    print(A_analytic)
-    print("Numerical A_ij (flipped):")
-    print(A_numeric_flipped)
-    print("Difference A:")
-    print(A_analytic - A_numeric_flipped)
-    print()
-    print("\n\n******B*********")
-    print("Analytical B_ij:")
-    print(B_analytic)
-    print("Numerical B_ij (flipped):")
-    print(B_numeric_flipped)
-    print("Difference B:")
-    print(B_analytic - B_numeric_flipped)
-
+    return gs
 
 def test_jacobians():
     """
@@ -338,6 +267,7 @@ def test_jacobians():
         gs.poses[1] = xj  # restore
 
     # Compare results
+    print("\n\n***********JACOBIAN TEST****************")
     print("\n\n\n******A*********")
     print("Analytical A_ij:")
     print(A_analytic)
@@ -354,7 +284,131 @@ def test_jacobians():
     print("Difference B:")
     print(B_analytic - B_numeric)
 
+def test_linear_system():
+    """
+    Unit test: Verify correct construction of H and b.
+    This test simply runs the function and prints the outputs for inspection.
+    """
+
+    # Build Graph SLAM object
+    gs = test_object_creation()
+
+    # Build system
+    H, b = gs.build_linear_system()
+
+    # Print system matrices for inspection
+    print("\n\n*********** LINEAR SYSTEM TEST ***********")
+    print("Information matrix H:")
+    print(H)
+    print("\nRight-hand side vector b:")
+    print(b)
+
 if __name__ == '__main__':
+    
+    print("\n*****GRAPH SLAM OBJECT TEST******")
+    test_object_creation()
+    test_jacobians()
+    test_linear_system()
+
+
+
+
+##################################################################
+#     DEPRICATED CODE
+##################################################################
+    # # Create graph object and set up small problem
+    # gs = GraphSLAM()
+
+    # # Add poses (same as previous tests)
+    # x0 = [0.0, 0.0, 0.0]
+    # x1 = [1.0, 0.0, 0.0]
+    # x2 = [2.0, 0.0, 0.0]
+
+    # gs.add_pose(x0)
+    # gs.add_pose(x1)
+    # gs.add_pose(x2)
+
+    # # Add constraints
+    # z_ij = [0.9, 0.1, 5 * pi / 180]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(0, 1, z_ij, Omega_ij)
+
+    # z_ij = [1.1, -0.1, 0.0]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(1, 2, z_ij, Omega_ij)
+
+
+
+# def test_jacobians():
+#     """
+#     Unit test: Compare analytical and numerical Jacobians.
+#     """
+
+#     delta_x = 1e-6  # small perturbation for finite difference
+
+#     # Example poses (arbitrary but reasonable values)
+#     xi = np.array([1.0, 2.0, 30 * np.pi / 180])  # Pose i: x, y, theta
+#     xj = np.array([2.5, 3.0, 40 * np.pi / 180])  # Pose j: x, y, theta
+
+#     # Fake observation (not used for Jacobian test)
+#     z_ij = np.array([0.0, 0.0, 0.0])
+#     Omega_ij = np.eye(3)
+
+#     # Build artificial constraint to reuse existing error function
+#     gs = GraphSLAM()
+#     gs.add_pose(xi)
+#     gs.add_pose(xj)
+#     constraint = (0, 1, z_ij, Omega_ij)
+
+#     # Compute baseline error
+#     e0 = gs.compute_error(constraint)
+
+#     # Compute analytical Jacobians
+#     A_analytic, B_analytic = GraphSLAM.compute_jacobians(xi, xj)
+
+#     # Numerical Jacobian for xi (A_ij)
+#     A_numeric = np.zeros((3, 3))
+#     for k in range(3):
+#         xi_perturbed = xi.copy()
+#         xi_perturbed[k] += delta_x
+#         gs.poses[0] = xi_perturbed  # update pose i
+#         e_perturbed = gs.compute_error(constraint)
+#         A_numeric[:, k] = (e_perturbed - e0) / delta_x
+#         gs.poses[0] = xi  # restore
+
+#     # Numerical Jacobian for xj (B_ij)
+#     B_numeric = np.zeros((3, 3))
+#     for k in range(3):
+#         xj_perturbed = xj.copy()
+#         xj_perturbed[k] += delta_x
+#         gs.poses[1] = xj_perturbed  # update pose j
+#         e_perturbed = gs.compute_error(constraint)
+#         B_numeric[:, k] = (e_perturbed - e0) / delta_x
+#         gs.poses[1] = xj  # restore
+
+#         # Flip numerical Jacobians for sign convention
+#         A_numeric_flipped = -A_numeric
+#         B_numeric_flipped = -B_numeric
+
+#         # Compare results after flipping
+        
+#     print("\n\n******A*********")
+#     print("Analytical A_ij:")
+#     print(A_analytic)
+#     print("Numerical A_ij (flipped):")
+#     print(A_numeric_flipped)
+#     print("Difference A:")
+#     print(A_analytic - A_numeric_flipped)
+#     print()
+#     print("\n\n******B*********")
+#     print("Analytical B_ij:")
+#     print(B_analytic)
+#     print("Numerical B_ij (flipped):")
+#     print(B_numeric_flipped)
+#     print("Difference B:")
+#     print(B_analytic - B_numeric_flipped)
+
+
     # # create Graph Slam object
     # gs = GraphSLAM()
 
@@ -391,8 +445,3 @@ if __name__ == '__main__':
     # # Error:
     # #   x1 → x2 : [-0.1  0.1  5.0 ]
     # #   x1 → x2 : [ 0.1 -0.1  0.0 ]
-    
-    print("\n*****GRAPH SLAM OBJECT TEST******")
-    test_object_creation()
-    print("\n\n***********JACOBIAN TEST****************")
-    test_jacobians()
