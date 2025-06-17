@@ -9,7 +9,7 @@ import numpy as np
 from numpy import pi
 
 def v2t(pose_vec):
-    """Convert [x, y, theta] → 3×3 homogeneous transform."""
+    """Convert [x, y, theta] → 3×3 homogeneous transform. """
     x, y, theta = pose_vec
     cos_theta = np.cos(theta)
     sin_theta = np.sin(theta)
