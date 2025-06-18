@@ -4,9 +4,13 @@ GraphSLAM class for simple 2D graph-based SLAM testing.
 This version supports adding fixed 2D poses and relative pose constraints,
 computing residuals, and preparing for Gauss-Newton optimization.
 """
-
+from scipy.stats import sigmaclip
+from lego_robot import *
 import numpy as np
-from numpy import pi
+from numpy import pi, sin, cos, pi, atan2
+import numpy as np
+import os
+os.chdir("Unit_H")
 
 def v2t(pose_vec):
     """Convert [x, y, theta] → 3×3 homogeneous transform. """
@@ -26,6 +30,131 @@ def t2v(T):
     y = T[1, 2]
     theta = np.arctan2(T[1, 0], T[0, 0])
     return np.array([x, y, theta])
+
+
+class ExtendedKalmanFilter:
+    def __init__(self, state, covariance,
+                 robot_width,
+                 control_motion_factor, control_turn_factor):
+        # The state. This is the core data of the Kalman filter.
+        self.state = state
+        self.covariance = covariance
+
+        # Some constants.
+        self.robot_width = robot_width
+        self.control_motion_factor = control_motion_factor
+        self.control_turn_factor = control_turn_factor
+
+    @staticmethod
+    def g(state, control, w):
+        x, y, theta = state
+        l, r = control
+        if r != l:
+            alpha = (r - l) / w
+            rad = l/alpha
+            g1 = x + (rad + w/2.)*( sin(theta+alpha) - sin(theta))
+            g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
+            g3 = (theta + alpha + pi) % (2*pi) - pi
+        else:
+            g1 = x + l * cos(theta)
+            g2 = y + l * sin(theta)
+            g3 = theta
+
+        return np.array([g1, g2, g3])
+
+    @staticmethod
+    def dg_dstate(state, control, w):
+        theta = state[2]
+        l, r = control
+        if r != l:
+            # This is for the case r != l.
+            # g has 3 components and the state has 3 components, so the
+            # derivative of g with respect to all state variables is a
+            # 3x3 matrix. To construct such a matrix in Python/Numpy,
+            # use: m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
+            # where 1, 2, 3 are the values of the first row of the matrix.
+            # Don't forget to return this matrix.
+            alpha = (r - l) / w
+            rad = l/alpha
+            dg1_dtheta = (rad + w/2.)*(cos(theta+alpha) - cos(theta))
+            dg2_dtheta = (rad + w/2.)*(sin(theta+alpha) - sin(theta))
+
+        else:
+            # This is for the special case r == l.
+            dg1_dtheta = -l*sin(theta)
+            dg2_dtheta =  l*cos(theta)
+
+        # The derivative of g with respect to x, y and theta is a 3x3 matrix.
+        m = np.array([
+            [1, 0, dg1_dtheta], 
+            [0, 1, dg2_dtheta], 
+            [0, 0, 1]])
+
+        return m
+
+    @staticmethod
+    def dg_dcontrol(state, control, w):
+        x, y, theta = state
+        l, r = tuple(control)
+
+        if r != l:
+            # --->>> Put your code here.
+            # This is for the case l != r.
+            # Note g has 3 components and control has 2, so the result
+            # will be a 3x2 (rows x columns) matrix.
+            alpha = (r - l) / w
+            theta2 = theta + alpha
+            dg1_dl =  w*r/((r-l)**2) * ( sin(theta2)-sin(theta)) - (r+l)/(2*(r-l)) * cos(theta2)
+            dg2_dl =  w*r/((r-l)**2) * (-cos(theta2)+cos(theta)) - (r+l)/(2*(r-l)) * sin(theta2)
+            dg3_dl = -1/w
+            dg1_dr = -w*l/((r-l)**2) * ( sin(theta2)-sin(theta)) + (r+l)/(2*(r-l)) * cos(theta2)
+            dg2_dr = -w*l/((r-l)**2) * (-cos(theta2)+cos(theta)) + (r+l)/(2*(r-l)) * sin(theta2)
+            dg3_dr = 1/w
+            
+        else:
+            dg1_dl = 0.5 * (cos(theta) + (l/w) * sin(theta))
+            dg2_dl = 0.5 * (sin(theta) - (l/w) * cos(theta))
+            dg3_dl = -1/w
+            dg1_dr = 0.5 * (cos(theta) - (l/w) * sin(theta))
+            dg2_dr = 0.5 * (sin(theta) + (l/w) * cos(theta))
+            dg3_dr = 1/w           
+
+        m = np.array([
+            [dg1_dl, dg1_dr], 
+            [dg2_dl, dg2_dr], 
+            [dg3_dl, dg3_dr]])
+            
+        return m
+
+    @staticmethod
+    def get_error_ellipse(covariance):
+        """Return the position covariance (which is the upper 2x2 submatrix)
+           as a triple: (main_axis_angle, stddev_1, stddev_2), where
+           main_axis_angle is the angle (pointing direction) of the main axis,
+           along which the standard deviation is stddev_1, and stddev_2 is the
+           standard deviation along the other (orthogonal) axis."""
+        eigenvals, eigenvects = linalg.eig(covariance[0:2,0:2])
+        angle = atan2(eigenvects[1,0], eigenvects[0,0])
+        return (angle, sqrt(eigenvals[0]), sqrt(eigenvals[1]))        
+
+    def predict(self, control):
+        """The prediction step of the Kalman filter."""
+        # covariance' = G * covariance * GT + R
+        # where R = V * (covariance in control space) * VT.
+        # Covariance in control space depends on move distance.
+        left, right = control
+        a1 = self.control_motion_factor
+        a2 = self.control_turn_factor
+        Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
+        Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
+        sigma_control = np.diag([Gl2, Gr2])
+        Vt = self.dg_dcontrol(self.state, control, self.robot_width)
+        Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
+        Gt = self.dg_dstate(self.state, control, self.robot_width)
+        self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
+
+        # state' = g(state, control)
+        self.state = self.g(self.state, control, self.robot_width)
 
 class GraphSLAM:
     def __init__(self):
@@ -362,6 +491,36 @@ def test_solver():
     print("\nFinal optimized state:")
     gs.print_summary()
 
+def test_prediction():
+    print("\n*****GRAPH SLAM PREDICTION TEST******")
+    initial_state = np.array([1850.0, 1897.0, 213.0 / 180.0 * pi])
+    initial_covariance = np.diag([100.0**2, 100.0**2, (10.0 / 180.0 * pi) ** 2])
+    ticks_to_mm = 0.349
+    robot_width = 155.0
+    motion_factor = 0.35
+    turn_factor = 0.6
+
+    ekf = ExtendedKalmanFilter(
+        initial_state,
+        initial_covariance,
+        robot_width,
+        motion_factor,
+        turn_factor
+    )
+
+    # Load odometry
+    logfile = LegoLogfile()
+    logfile.read("robot4_motors.txt")
+
+    # Output file
+    with open("graph_slam_prediction.txt", "w") as f:
+        for ticks in logfile.motor_ticks:
+            control = np.array(ticks) * ticks_to_mm
+            ekf.predict(control)
+            x, y, θ = ekf.state
+            line = f"F {x} {y} {θ}\n"
+            f.write(line)
+
 
 if __name__ == '__main__':
     
@@ -370,58 +529,57 @@ if __name__ == '__main__':
     test_jacobians()
     test_linear_system()
     test_solver()
+    test_prediction()
 
-# if __name__ == '__main__':
 
-#     print("\n***** GRAPH SLAM OBJECT TEST ******")
-#     test_object_creation()
-#     test_jacobians()
-#     test_linear_system()
-#     test_solver()
 
-    print("\n***** FRAMEWORK TEST: READ ODOMETRY AND LOG POSES ******")
+
+
+
+
+    # print("\n***** FRAMEWORK TEST: READ ODOMETRY AND LOG POSES ******")
     
-    from lego_robot import LegoLogfile
-    from math import cos, sin
-    from numpy import array
+    # from lego_robot import LegoLogfile
+    # from math import cos, sin
+    # from numpy import array
 
-    scanner_displacement = 30.0  # mm
-    ticks_to_mm = 0.349
-    robot_width = 155.0
+    # scanner_displacement = 30.0  # mm
+    # ticks_to_mm = 0.349
+    # robot_width = 155.0
 
-    # Initial pose: (x, y, θ)
-    initial_pose = array([0.0, 0.0, 0.0])
-    poses = [tuple(initial_pose)]
+    # # Initial pose: (x, y, θ)
+    # initial_pose = array([0.0, 0.0, 0.0])
+    # poses = [tuple(initial_pose)]
 
-    # Load odometry using Brenner's class
-    logfile = LegoLogfile()
-    logfile.read("robot4_motors.txt")
+    # # Load odometry using Brenner's class
+    # logfile = LegoLogfile()
+    # logfile.read("robot4_motors.txt")
 
-    # Naive forward motion model (no optimization)
-    x, y, theta = initial_pose
-    for ticks in logfile.motor_ticks:
-        l_ticks, r_ticks = ticks
-        l = l_ticks * ticks_to_mm
-        r = r_ticks * ticks_to_mm
-        if abs(l - r) < 1e-6:
-            x += l * cos(theta)
-            y += l * sin(theta)
-        else:
-            alpha = (r - l) / robot_width
-            R = l / alpha
-            cx = x - (R + robot_width / 2.0) * sin(theta)
-            cy = y + (R + robot_width / 2.0) * cos(theta)
-            theta += alpha
-            x = cx + (R + robot_width / 2.0) * sin(theta)
-            y = cy - (R + robot_width / 2.0) * cos(theta)
-        poses.append((x, y, theta))
+    # # Naive forward motion model (no optimization)
+    # x, y, theta = initial_pose
+    # for ticks in logfile.motor_ticks:
+    #     l_ticks, r_ticks = ticks
+    #     l = l_ticks * ticks_to_mm
+    #     r = r_ticks * ticks_to_mm
+    #     if abs(l - r) < 1e-6:
+    #         x += l * cos(theta)
+    #         y += l * sin(theta)
+    #     else:
+    #         alpha = (r - l) / robot_width
+    #         R = l / alpha
+    #         cx = x - (R + robot_width / 2.0) * sin(theta)
+    #         cy = y + (R + robot_width / 2.0) * cos(theta)
+    #         theta += alpha
+    #         x = cx + (R + robot_width / 2.0) * sin(theta)
+    #         y = cy - (R + robot_width / 2.0) * cos(theta)
+    #     poses.append((x, y, theta))
 
-    # Write result using Brenner-compatible format
-    with open("graph_slam_result.txt", "w") as f:
-        for x, y, theta in poses:
-            f.write(f"{x:.6f} {y:.6f} {theta:.6f}\n")
+    # # Write result using Brenner-compatible format
+    # with open("graph_slam_result.txt", "w") as f:
+    #     for x, y, theta in poses:
+    #         f.write(f"{x:.6f} {y:.6f} {theta:.6f}\n")
 
-    print("Wrote", len(poses), "poses to graph_slam_result.txt")
+    # print("Wrote", len(poses), "poses to graph_slam_result.txt")
 
 
 
