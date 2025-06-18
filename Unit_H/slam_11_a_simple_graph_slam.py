@@ -137,8 +137,8 @@ class GraphSLAM:
             H_jj = B_ij.T @ Omega_ij @ B_ij
 
             # Compute blocks for b
-            b_i = A_ij.T @ Omega_ij @ e_ij
-            b_j = B_ij.T @ Omega_ij @ e_ij
+            b_i = - A_ij.T @ Omega_ij @ e_ij
+            b_j = - B_ij.T @ Omega_ij @ e_ij
 
             # Assemble into global H and b
             i_idx = slice(3 * i, 3 * i + 3)
@@ -339,12 +339,90 @@ def test_linear_system():
     print("\nRight-hand side vector b:")
     print(b)
 
+def test_solver():
+    """
+    Unit test: Verify full Gauss-Newton optimization converges correctly.
+    """
+
+    print("\n\n*********** SOLVER TEST ***********")
+
+    # Build Graph SLAM object using existing helper
+    
+    print("\nInitial State:")
+    gs = test_object_creation()
+
+    # Print initial error
+    print("\nInitial state:")
+    gs.print_summary()
+
+    # Run optimization
+    gs.solve(max_iterations=10, tol=1e-6)
+
+    # Print final optimized state
+    print("\nFinal optimized state:")
+    gs.print_summary()
+
+
 if __name__ == '__main__':
     
     print("\n*****GRAPH SLAM OBJECT TEST******")
     test_object_creation()
     test_jacobians()
     test_linear_system()
+    test_solver()
+
+# if __name__ == '__main__':
+
+#     print("\n***** GRAPH SLAM OBJECT TEST ******")
+#     test_object_creation()
+#     test_jacobians()
+#     test_linear_system()
+#     test_solver()
+
+    print("\n***** FRAMEWORK TEST: READ ODOMETRY AND LOG POSES ******")
+    
+    from lego_robot import LegoLogfile
+    from math import cos, sin
+    from numpy import array
+
+    scanner_displacement = 30.0  # mm
+    ticks_to_mm = 0.349
+    robot_width = 155.0
+
+    # Initial pose: (x, y, θ)
+    initial_pose = array([0.0, 0.0, 0.0])
+    poses = [tuple(initial_pose)]
+
+    # Load odometry using Brenner's class
+    logfile = LegoLogfile()
+    logfile.read("robot4_motors.txt")
+
+    # Naive forward motion model (no optimization)
+    x, y, theta = initial_pose
+    for ticks in logfile.motor_ticks:
+        l_ticks, r_ticks = ticks
+        l = l_ticks * ticks_to_mm
+        r = r_ticks * ticks_to_mm
+        if abs(l - r) < 1e-6:
+            x += l * cos(theta)
+            y += l * sin(theta)
+        else:
+            alpha = (r - l) / robot_width
+            R = l / alpha
+            cx = x - (R + robot_width / 2.0) * sin(theta)
+            cy = y + (R + robot_width / 2.0) * cos(theta)
+            theta += alpha
+            x = cx + (R + robot_width / 2.0) * sin(theta)
+            y = cy - (R + robot_width / 2.0) * cos(theta)
+        poses.append((x, y, theta))
+
+    # Write result using Brenner-compatible format
+    with open("graph_slam_result.txt", "w") as f:
+        for x, y, theta in poses:
+            f.write(f"{x:.6f} {y:.6f} {theta:.6f}\n")
+
+    print("Wrote", len(poses), "poses to graph_slam_result.txt")
+
 
 
 
