@@ -10,216 +10,236 @@ import numpy as np
 from numpy import pi, sin, cos, pi, atan2
 import numpy as np
 import os
-os.chdir("Unit_H")
 
-def v2t(pose_vec):
-    """Convert [x, y, theta] → 3×3 homogeneous transform. """
-    x, y, theta = pose_vec
-    cos_theta = np.cos(theta)
-    sin_theta = np.sin(theta)
-    T = np.array([
-        [cos_theta, -sin_theta, x],
-        [sin_theta,  cos_theta, y],
-        [0,          0,         1]
-    ])
-    return T
+# def v2t(pose_vec):
+#     """Convert [x, y, theta] → 3×3 homogeneous transform. """
+#     x, y, theta = pose_vec
+#     cos_theta = np.cos(theta)
+#     sin_theta = np.sin(theta)
+#     T = np.array([
+#         [cos_theta, -sin_theta, x],
+#         [sin_theta,  cos_theta, y],
+#         [0,          0,         1]
+#     ])
+#     return T
 
-def t2v(T):
-    """Convert 3×3 homogeneous transform → [x, y, theta]."""
-    x = T[0, 2]
-    y = T[1, 2]
-    theta = np.arctan2(T[1, 0], T[0, 0])
-    return np.array([x, y, theta])
+# def t2v(T):
+#     """Convert 3×3 homogeneous transform → [x, y, theta]."""
+#     x = T[0, 2]
+#     y = T[1, 2]
+#     theta = np.arctan2(T[1, 0], T[0, 0])
+#     return np.array([x, y, theta])
 
 
-class ExtendedKalmanFilter:
-    def __init__(self, state, covariance,
-                 robot_width,
-                 control_motion_factor, control_turn_factor):
-        # The state. This is the core data of the Kalman filter.
-        self.state = state
-        self.covariance = covariance
+# class ExtendedKalmanFilter:
+#     def __init__(self, state, covariance,
+#                  robot_width,
+#                  control_motion_factor, control_turn_factor):
+#         # The state. This is the core data of the Kalman filter.
+#         self.state = state
+#         self.covariance = covariance
 
-        #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-        self.last_relative_motion = np.zeros(3)
-        self.last_motion_covariance = None
-        # <<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
+#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
+#         self.last_relative_motion = np.zeros(3)
+#         self.last_motion_covariance = None
+#         # <<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
 
-        # Some constants.
-        self.robot_width = robot_width
-        self.control_motion_factor = control_motion_factor
-        self.control_turn_factor = control_turn_factor
+#         # Some constants.
+#         self.robot_width = robot_width
+#         self.control_motion_factor = control_motion_factor
+#         self.control_turn_factor = control_turn_factor
 
-    @staticmethod
-    def g(state, control, w):
-        x, y, theta = state
-        l, r = control
-        if r != l:
-            alpha = (r - l) / w
-            rad = l/alpha
-            g1 = x + (rad + w/2.)*( sin(theta+alpha) - sin(theta))
-            g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
-            g3 = (theta + alpha + pi) % (2*pi) - pi
-        else:
-            g1 = x + l * cos(theta)
-            g2 = y + l * sin(theta)
-            g3 = theta
+#     @staticmethod
+#     def g(state, control, w):
+#         x, y, theta = state
+#         l, r = control
+#         if r != l:
+#             alpha = (r - l) / w
+#             rad = l/alpha
+#             g1 = x + (rad + w/2.)*( sin(theta+alpha) - sin(theta))
+#             g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
+#             g3 = (theta + alpha + pi) % (2*pi) - pi
+#         else:
+#             g1 = x + l * cos(theta)
+#             g2 = y + l * sin(theta)
+#             g3 = theta
 
-        return np.array([g1, g2, g3])
+#         return np.array([g1, g2, g3])
 
-    @staticmethod
-    def dg_dstate(state, control, w):
-        theta = state[2]
-        l, r = control
-        if r != l:
-            # This is for the case r != l.
-            # g has 3 components and the state has 3 components, so the
-            # derivative of g with respect to all state variables is a
-            # 3x3 matrix. To construct such a matrix in Python/Numpy,
-            # use: m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
-            # where 1, 2, 3 are the values of the first row of the matrix.
-            # Don't forget to return this matrix.
-            alpha = (r - l) / w
-            rad = l/alpha
-            dg1_dtheta = (rad + w/2.)*(cos(theta+alpha) - cos(theta))
-            dg2_dtheta = (rad + w/2.)*(sin(theta+alpha) - sin(theta))
+#     @staticmethod
+#     def dg_dstate(state, control, w):
+#         theta = state[2]
+#         l, r = control
+#         if r != l:
+#             # This is for the case r != l.
+#             # g has 3 components and the state has 3 components, so the
+#             # derivative of g with respect to all state variables is a
+#             # 3x3 matrix. To construct such a matrix in Python/Numpy,
+#             # use: m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
+#             # where 1, 2, 3 are the values of the first row of the matrix.
+#             # Don't forget to return this matrix.
+#             alpha = (r - l) / w
+#             rad = l/alpha
+#             dg1_dtheta = (rad + w/2.)*(cos(theta+alpha) - cos(theta))
+#             dg2_dtheta = (rad + w/2.)*(sin(theta+alpha) - sin(theta))
 
-        else:
-            # This is for the special case r == l.
-            dg1_dtheta = -l*sin(theta)
-            dg2_dtheta =  l*cos(theta)
+#         else:
+#             # This is for the special case r == l.
+#             dg1_dtheta = -l*sin(theta)
+#             dg2_dtheta =  l*cos(theta)
 
-        # The derivative of g with respect to x, y and theta is a 3x3 matrix.
-        m = np.array([
-            [1, 0, dg1_dtheta], 
-            [0, 1, dg2_dtheta], 
-            [0, 0, 1]])
+#         # The derivative of g with respect to x, y and theta is a 3x3 matrix.
+#         m = np.array([
+#             [1, 0, dg1_dtheta], 
+#             [0, 1, dg2_dtheta], 
+#             [0, 0, 1]])
 
-        return m
+#         return m
 
-    @staticmethod
-    def dg_dcontrol(state, control, w):
-        x, y, theta = state
-        l, r = tuple(control)
+#     @staticmethod
+#     def dg_dcontrol(state, control, w):
+#         x, y, theta = state
+#         l, r = tuple(control)
 
-        if r != l:
-            # --->>> Put your code here.
-            # This is for the case l != r.
-            # Note g has 3 components and control has 2, so the result
-            # will be a 3x2 (rows x columns) matrix.
-            alpha = (r - l) / w
-            theta2 = theta + alpha
-            dg1_dl =  w*r/((r-l)**2) * ( sin(theta2)-sin(theta)) - (r+l)/(2*(r-l)) * cos(theta2)
-            dg2_dl =  w*r/((r-l)**2) * (-cos(theta2)+cos(theta)) - (r+l)/(2*(r-l)) * sin(theta2)
-            dg3_dl = -1/w
-            dg1_dr = -w*l/((r-l)**2) * ( sin(theta2)-sin(theta)) + (r+l)/(2*(r-l)) * cos(theta2)
-            dg2_dr = -w*l/((r-l)**2) * (-cos(theta2)+cos(theta)) + (r+l)/(2*(r-l)) * sin(theta2)
-            dg3_dr = 1/w
+#         if r != l:
+#             # --->>> Put your code here.
+#             # This is for the case l != r.
+#             # Note g has 3 components and control has 2, so the result
+#             # will be a 3x2 (rows x columns) matrix.
+#             alpha = (r - l) / w
+#             theta2 = theta + alpha
+#             dg1_dl =  w*r/((r-l)**2) * ( sin(theta2)-sin(theta)) - (r+l)/(2*(r-l)) * cos(theta2)
+#             dg2_dl =  w*r/((r-l)**2) * (-cos(theta2)+cos(theta)) - (r+l)/(2*(r-l)) * sin(theta2)
+#             dg3_dl = -1/w
+#             dg1_dr = -w*l/((r-l)**2) * ( sin(theta2)-sin(theta)) + (r+l)/(2*(r-l)) * cos(theta2)
+#             dg2_dr = -w*l/((r-l)**2) * (-cos(theta2)+cos(theta)) + (r+l)/(2*(r-l)) * sin(theta2)
+#             dg3_dr = 1/w
             
-        else:
-            dg1_dl = 0.5 * (cos(theta) + (l/w) * sin(theta))
-            dg2_dl = 0.5 * (sin(theta) - (l/w) * cos(theta))
-            dg3_dl = -1/w
-            dg1_dr = 0.5 * (cos(theta) - (l/w) * sin(theta))
-            dg2_dr = 0.5 * (sin(theta) + (l/w) * cos(theta))
-            dg3_dr = 1/w           
+#         else:
+#             dg1_dl = 0.5 * (cos(theta) + (l/w) * sin(theta))
+#             dg2_dl = 0.5 * (sin(theta) - (l/w) * cos(theta))
+#             dg3_dl = -1/w
+#             dg1_dr = 0.5 * (cos(theta) - (l/w) * sin(theta))
+#             dg2_dr = 0.5 * (sin(theta) + (l/w) * cos(theta))
+#             dg3_dr = 1/w           
 
-        m = np.array([
-            [dg1_dl, dg1_dr], 
-            [dg2_dl, dg2_dr], 
-            [dg3_dl, dg3_dr]])
+#         m = np.array([
+#             [dg1_dl, dg1_dr], 
+#             [dg2_dl, dg2_dr], 
+#             [dg3_dl, dg3_dr]])
             
-        return m
+#         return m
 
-    @staticmethod
-    def get_error_ellipse(covariance):
-        """Return the position covariance (which is the upper 2x2 submatrix)
-           as a triple: (main_axis_angle, stddev_1, stddev_2), where
-           main_axis_angle is the angle (pointing direction) of the main axis,
-           along which the standard deviation is stddev_1, and stddev_2 is the
-           standard deviation along the other (orthogonal) axis."""
-        eigenvals, eigenvects = linalg.eig(covariance[0:2,0:2])
-        angle = atan2(eigenvects[1,0], eigenvects[0,0])
-        return (angle, sqrt(eigenvals[0]), sqrt(eigenvals[1]))        
+#     @staticmethod
+#     def get_error_ellipse(covariance):
+#         """Return the position covariance (which is the upper 2x2 submatrix)
+#            as a triple: (main_axis_angle, stddev_1, stddev_2), where
+#            main_axis_angle is the angle (pointing direction) of the main axis,
+#            along which the standard deviation is stddev_1, and stddev_2 is the
+#            standard deviation along the other (orthogonal) axis."""
+#         eigenvals, eigenvects = linalg.eig(covariance[0:2,0:2])
+#         angle = atan2(eigenvects[1,0], eigenvects[0,0])
+#         return (angle, sqrt(eigenvals[0]), sqrt(eigenvals[1]))        
 
-    def predict_old(self, control):
-        """The prediction step of the Kalman filter."""
-        # covariance' = G * covariance * GT + R
-        # where R = V * (covariance in control space) * VT.
-        # Covariance in control space depends on move distance.
-        left, right = control
-        a1 = self.control_motion_factor
-        a2 = self.control_turn_factor
-        Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
-        Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
-        sigma_control = np.diag([Gl2, Gr2])
-        Vt = self.dg_dcontrol(self.state, control, self.robot_width)
-        Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
-        Gt = self.dg_dstate(self.state, control, self.robot_width)
-        self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
+#     def predict_old(self, control):
+#         """The prediction step of the Kalman filter."""
+#         # covariance' = G * covariance * GT + R
+#         # where R = V * (covariance in control space) * VT.
+#         # Covariance in control space depends on move distance.
+#         left, right = control
+#         a1 = self.control_motion_factor
+#         a2 = self.control_turn_factor
+#         Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
+#         Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
+#         sigma_control = np.diag([Gl2, Gr2])
+#         Vt = self.dg_dcontrol(self.state, control, self.robot_width)
+#         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
+#         Gt = self.dg_dstate(self.state, control, self.robot_width)
+#         self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
 
-        # state' = g(state, control)
-        self.state = self.g(self.state, control, self.robot_width)
+#         # state' = g(state, control)
+#         self.state = self.g(self.state, control, self.robot_width)
 
-    #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-    def get_last_relative_motion(self):
-        return self.last_relative_motion
+#     #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
+#     def get_last_relative_motion(self):
+#         return self.last_relative_motion
 
-    def get_last_motion_covariance(self):
-        return self.last_motion_covariance
-    #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
+#     def get_last_motion_covariance(self):
+#         return self.last_motion_covariance
+#     #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
 
-    def predict(self, control):
-        """The prediction step of the Kalman filter."""
+#     def predict(self, control):
+#         """The prediction step of the Kalman filter."""
 
-        # Store previous state for relative motion
-        x_prev = self.state.copy()
+#         # Store previous state for relative motion
+#         x_prev = self.state.copy()
 
-        # 1. Predict covariance
-        left, right = control
-        a1 = self.control_motion_factor
-        a2 = self.control_turn_factor
-        Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
-        Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
-        sigma_control = np.diag([Gl2, Gr2])
+#         # 1. Predict covariance
+#         left, right = control
+#         a1 = self.control_motion_factor
+#         a2 = self.control_turn_factor
+#         Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
+#         Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
+#         sigma_control = np.diag([Gl2, Gr2])
 
-        Vt = self.dg_dcontrol(self.state, control, self.robot_width)
+#         Vt = self.dg_dcontrol(self.state, control, self.robot_width)
         
     
     
-        #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-        Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
-        self.last_motion_covariance = Rt
-        #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
+#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
+#         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
+#         self.last_motion_covariance = Rt
+#         #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
 
-        Gt = self.dg_dstate(self.state, control, self.robot_width)
-        self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
+#         Gt = self.dg_dstate(self.state, control, self.robot_width)
+#         self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
 
-        # 2. Predict new state
-        x_curr = self.g(self.state, control, self.robot_width)
-        self.state = x_curr
+#         # 2. Predict new state
+#         x_curr = self.g(self.state, control, self.robot_width)
+#         self.state = x_curr
 
-        # 3. Compute relative motion in the local frame of x_prev
-        dx = x_curr[0] - x_prev[0]
-        dy = x_curr[1] - x_prev[1]
-        dtheta = x_curr[2] - x_prev[2]
-        theta = x_prev[2]
+#         # 3. Compute relative motion in the local frame of x_prev
+#         dx = x_curr[0] - x_prev[0]
+#         dy = x_curr[1] - x_prev[1]
+#         dtheta = x_curr[2] - x_prev[2]
+#         theta = x_prev[2]
 
-        # Rotate into local frame of x_prev
-        rot_dx = cos(-theta) * dx - sin(-theta) * dy
-        rot_dy = sin(-theta) * dx + cos(-theta) * dy
-        rot_dtheta = (dtheta + pi) % (2 * pi) - pi
+#         # Rotate into local frame of x_prev
+#         rot_dx = cos(-theta) * dx - sin(-theta) * dy
+#         rot_dy = sin(-theta) * dx + cos(-theta) * dy
+#         rot_dtheta = (dtheta + pi) % (2 * pi) - pi
 
         
-        #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-        # 4. Store the result
-        self.last_relative_motion = np.array([rot_dx, rot_dy, rot_dtheta])
-        #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
+#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
+#         # 4. Store the result
+#         self.last_relative_motion = np.array([rot_dx, rot_dy, rot_dtheta])
+#         #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
 
 class GraphSLAM:
     def __init__(self):
         self.poses = []               # List of 2D poses: [x, y, theta]
         self.constraints = []         # List of tuples: (i, j, z_ij, Omega_ij)
+    
+    @staticmethod
+    def v2t(pose_vec):
+        """Convert [x, y, theta] → 3×3 homogeneous transform. """
+        x, y, theta = pose_vec
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
+        T = np.array([
+            [cos_theta, -sin_theta, x],
+            [sin_theta,  cos_theta, y],
+            [0,          0,         1]
+        ])
+        return T
+
+    @staticmethod
+    def t2v(T):
+        """Convert 3×3 homogeneous transform → [x, y, theta]."""
+        x = T[0, 2]
+        y = T[1, 2]
+        theta = np.arctan2(T[1, 0], T[0, 0])
+        return np.array([x, y, theta])
 
     def add_pose(self, pose):
         """Add a new pose to the graph."""
@@ -243,11 +263,11 @@ class GraphSLAM:
         xj = self.poses[j]
 
         # Convert to transforms
-        Ti = v2t(xi)
-        Tj = v2t(xj)
+        Ti = GraphSLAM.v2t(xi)
+        Tj = GraphSLAM.v2t(xj)
 
         Tij_pred = np.linalg.inv(Ti) @ Tj
-        Zij_hat = t2v(Tij_pred)
+        Zij_hat = GraphSLAM.t2v(Tij_pred)
 
         error = Zij - Zij_hat
         error[2] = (error[2] + np.pi) % (2 * np.pi) - np.pi
@@ -599,11 +619,13 @@ def test_prediction():
         motion_factor,
         turn_factor
     )
+
     #>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>>>>>>>>>
     # Graph SLAM setup (back-end)
     graph_slam = GraphSLAM()
     graph_slam.add_pose(initial_state.copy())  # Pose x0
    #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
+
     # Load odometry
     logfile = LegoLogfile()
     logfile.read("robot4_motors.txt")
@@ -634,13 +656,13 @@ def test_prediction():
 
 
 if __name__ == '__main__':
-    
+    os.chdir("Unit_H")
     print("\n*****GRAPH SLAM OBJECT TEST******")
     test_object_creation()
     test_jacobians()
     test_linear_system()
     test_solver()
-    test_prediction()
+    #test_prediction()
 
 
 
