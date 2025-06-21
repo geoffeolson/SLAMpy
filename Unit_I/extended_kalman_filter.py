@@ -8,6 +8,7 @@ import numpy as np
 from numpy import *
 from slam_d_library import get_observations, write_cylinders
 import os
+import json
 
 class EKF:
     def __init__(self, state, covariance,
@@ -30,6 +31,36 @@ class EKF:
         self.control_turn_factor = control_turn_factor
         self.measurement_distance_stddev = measurement_distance_stddev
         self.measurement_angle_stddev = measurement_angle_stddev
+
+    def read_json(self, json_obj):
+        """Initialize EKF constants from a JSON object (dict)."""
+        self.ticks_to_mm = json_obj["ticks_to_mm"]
+        self.cylinder_offset = json_obj["cylinder_offset"]
+        self.depth_jump = json_obj["depth_jump"]
+        self.minimum_valid_distance = json_obj["minimum_valid_distance"]
+        self.max_cylinder_distance = json_obj["max_cylinder_distance"]
+        self.robot_width = json_obj["robot_width"]
+        self.scanner_displacement = json_obj["scanner_displacement"]
+        self.control_motion_factor = json_obj["control_motion_factor"]
+        self.control_turn_factor = json_obj["control_turn_factor"]
+        self.measurement_distance_stddev = json_obj["measurement_distance_stddev"]
+        self.measurement_angle_stddev = json_obj["measurement_angle_stddev"]
+
+    def write_json(self):
+        """Export EKF constants to a JSON-compatible dict."""
+        return {
+            "ticks_to_mm": self.ticks_to_mm,
+            "cylinder_offset": self.cylinder_offset,
+            "depth_jump": self.depth_jump,
+            "minimum_valid_distance": self.minimum_valid_distance,
+            "max_cylinder_distance": self.max_cylinder_distance,
+            "robot_width": self.robot_width,
+            "scanner_displacement": self.scanner_displacement,
+            "control_motion_factor": self.control_motion_factor,
+            "control_turn_factor": self.control_turn_factor,
+            "measurement_distance_stddev": self.measurement_distance_stddev,
+            "measurement_angle_stddev": self.measurement_angle_stddev
+    }
 
     @staticmethod
     def g(state, control, w):
