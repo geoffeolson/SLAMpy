@@ -9,8 +9,6 @@ from numpy import *
 from slam_d_library import get_observations, write_cylinders
 import os
 
-
-
 class EKF:
     def __init__(self, state, covariance,
                  robot_width, scanner_displacement,
@@ -20,12 +18,12 @@ class EKF:
         self.state = state
         self.covariance = covariance
 
-        #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-        self.last_relative_motion = np.zeros(3)
-        self.last_motion_covariance = None
-        # <<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
-
         # Some constants.
+        self.ticks_to_mm = 0.349
+        self.cylinder_offset = 90.0
+        self.depth_jump = 100.0
+        self.minimum_valid_distance = 20.0
+        self.max_cylinder_distance = 300.0
         self.robot_width = robot_width
         self.scanner_displacement = scanner_displacement
         self.control_motion_factor = control_motion_factor
@@ -190,13 +188,6 @@ class EKF:
         innovation[1] = (innovation[1] + pi) % (2*pi) - pi
         self.state = self.state + K @ innovation
         self.covariance = (eye(3) - K @ H) @ S
-
-class Constraint:
-     def __init__(self):
-         """kjkj"""
-         self.Omega_ij = np.zeros((3, 3))  # Information matrix.
-         self.z_ij = np.zeros(3)  # Measurement vector.
-
 
 if __name__ == '__main__':
     os.chdir("Unit_I")

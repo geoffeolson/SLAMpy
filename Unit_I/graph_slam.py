@@ -215,10 +215,49 @@ import os
 #         self.last_relative_motion = np.array([rot_dx, rot_dy, rot_dtheta])
 #         #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
 
+
 class GraphSLAM:
     def __init__(self):
-        self.poses = []               # List of 2D poses: [x, y, theta]
-        self.constraints = []         # List of tuples: (i, j, z_ij, Omega_ij)
+        self.poses = []                      # List of 2D poses: [x, y, theta]
+        self.constraints = []                # List of tuples: (i, j, z_ij, Omega_ij)
+        self.observation_constraints = []    # List of tuples: (pose_index, landmark_index, z_ik, Omega_ik)
+                                             # where z_ik is the relative observation of landmark k from pose i
+
+    def compute_relative_pose(self, x_i, x_j):
+        """Compute the relative pose x_ij from x_i to x_j."""
+        dx = x_j[0] - x_i[0]
+        dy = x_j[1] - x_i[1]
+        dθ = x_j[2] - x_i[2]
+        θ = x_i[2]
+        rot_dx = cos(-θ) * dx - sin(-θ) * dy
+        rot_dy = sin(-θ) * dx + cos(-θ) * dy
+        rot_dθ = (dθ + pi) % (2 * pi) - pi
+        return np.array([rot_dx, rot_dy, rot_dθ])
+
+    def compute_information_matrix(self, Σ_ij):
+        """Compute the information matrix Ω_ij from covariance Σ_ij."""
+        try:
+            return np.linalg.inv(Σ_ij)
+        except np.linalg.LinAlgError:
+            return np.zeros_like(Σ_ij)
+
+    def add_motion_constraint(self, x_j, Σ_ij):
+        """
+        Add a motion constraint between the last pose and the new pose x_j.
+        Automatically computes x_ij and Ω_ij internally.
+        """
+        i = len(self.poses) - 1
+        self.poses.append(x_j)
+
+        if i < 0:
+            # First pose, nothing to constrain yet.
+            return
+
+        x_i = self.poses[i]
+        x_ij = self.compute_relative_pose(x_i, x_j)
+        Ω_ij = self.compute_information_matrix(Σ_ij)
+
+        self.constraints.append((i, i + 1, x_ij, Ω_ij))
     
     @staticmethod
     def v2t(pose_vec):
@@ -252,6 +291,17 @@ class GraphSLAM:
         Omega_ij: 3x3 information matrix
         """
         self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
+
+    def add_observation_constraint(self, pose_index, landmark_index, z_ij, Omega_ij):
+        """
+        Add an observation constraint between a pose and a landmark.
+    
+        pose_index: Index of the robot pose at the time of observation.
+        landmark_index: Unique ID or index of the observed landmark.
+        z_ij: Measured observation from the pose to the landmark (in the robot's local frame).
+        Omega_ij: 2x2 or 3x3 information matrix of the observation (inverse of covariance).
+        """
+        self.observation_constraints.append((pose_index, landmark_index, np.array(z_ij), np.array(Omega_ij)))
 
     def compute_error(self, constraint):
         """
