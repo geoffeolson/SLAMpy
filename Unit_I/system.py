@@ -31,6 +31,8 @@ class System:
         # self.cylinder_offset = 90.0
         # self.max_cylinder_distance = 300.0
 
+
+
     def run(self):
         from lego_robot import LegoLogfile
         from slam_d_library import get_observations
@@ -51,8 +53,15 @@ class System:
                 self.ekf.state, self.ekf.scanner_displacement,
                 reference_cylinders, self.ekf.max_cylinder_distance)
 
-            for j in range(len(observations)):
-                self.ekf.correct(*observations[j])
+            # for j in range(len(observations)):
+            #     self.ekf.correct(*observations[j])
+
+            for obs in observations:
+                pose_index, z_ik, landmark_index, Sigma_ik = obs
+                self.ekf.correct(pose_index, z_ik, landmark_index, Sigma_ik)
+                self.graph_slam.add_observation_constraint(pose_index, landmark_index, z_ik, Sigma_ik)
+
+ 
 
             self.states.append(self.ekf.state)
             self.covariances.append(self.ekf.covariance)

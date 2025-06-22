@@ -218,6 +218,7 @@ import os
 
 class GraphSLAM:
     def __init__(self):
+        self.landmarks = []                  # List of 2D landmark positions [x, y]
         self.poses = []                      # List of 2D poses: [x, y, theta]
         self.constraints = []                # List of tuples: (i, j, z_ij, Omega_ij)
         self.observation_constraints = []    # List of tuples: (pose_index, landmark_index, z_ik, Omega_ik)
@@ -227,21 +228,21 @@ class GraphSLAM:
         """Compute the relative pose x_ij from x_i to x_j."""
         dx = x_j[0] - x_i[0]
         dy = x_j[1] - x_i[1]
-        dθ = x_j[2] - x_i[2]
+        dtheta = x_j[2] - x_i[2]
         θ = x_i[2]
         rot_dx = cos(-θ) * dx - sin(-θ) * dy
         rot_dy = sin(-θ) * dx + cos(-θ) * dy
-        rot_dθ = (dθ + pi) % (2 * pi) - pi
-        return np.array([rot_dx, rot_dy, rot_dθ])
+        rot_dtheta = (dtheta + pi) % (2 * pi) - pi
+        return np.array([rot_dx, rot_dy, rot_dtheta])
 
-    def compute_information_matrix(self, Σ_ij):
+    def compute_information_matrix(self, Sigma_ij):
         """Compute the information matrix Ω_ij from covariance Σ_ij."""
         try:
-            return np.linalg.inv(Σ_ij)
+            return np.linalg.inv(Sigma_ij)
         except np.linalg.LinAlgError:
-            return np.zeros_like(Σ_ij)
+            return np.zeros_like(Sigma_ij)
 
-    def add_motion_constraint(self, x_j, Σ_ij):
+    def add_motion_constraint(self, x_j, Sigma_ij):
         """
         Add a motion constraint between the last pose and the new pose x_j.
         Automatically computes x_ij and Ω_ij internally.
@@ -255,28 +256,95 @@ class GraphSLAM:
 
         x_i = self.poses[i]
         x_ij = self.compute_relative_pose(x_i, x_j)
-        Ω_ij = self.compute_information_matrix(Σ_ij)
+        Omega_ij = self.compute_information_matrix(Sigma_ij)
 
-        self.constraints.append((i, i + 1, x_ij, Ω_ij))
+        self.constraints.append((i, i + 1, x_ij, Omega_ij))
 
-    def add_observation_constraint(self, i, k, z_ik, Q):
+    # def add_observation_constraint(self, i, k, z_ik, Sigma_ik):
+    #     """
+    #     Add an observation constraint between pose i and landmark k.
+
+    #     Args:
+    #         i: Pose index in the graph.
+    #         k: Landmark index (or unique ID).
+    #         z_ik: Measurement residual (z - h(x_i, k)), shape (2,)
+    #         Q: Measurement covariance matrix (2x2)
+    #     """
+    #     try:
+    #         Omega_ik = np.linalg.inv(Sigma_ik)  # Convert to information matrix
+    #     except np.linalg.LinAlgError:
+    #         Omega_ik = np.zeros_like(Sigma_ik)
+
+    #     self.observation_constraints.append((i, k, z_ik, Omega_ik))
+
+    @staticmethod
+    def h_observation(x_i, x_k):
         """
-        Add an observation constraint between pose i and landmark k.
+        Predicts the observation of landmark k from pose i in rectangular coordinates.
 
-        Args:
-            i: Pose index in the graph.
-            k: Landmark index (or unique ID).
-            z_ik: Measurement residual (z - h(x_i, k)), shape (2,)
-            Q: Measurement covariance matrix (2x2)
+        Parameters:
+        - x_i: ndarray of shape (3,), the robot pose [x, y, θ]
+        - x_k: ndarray of shape (2,), the landmark position [x, y]
+
+        Returns:
+        - z_ik_pred: ndarray of shape (2,), the predicted observation in local frame
         """
-        try:
-            Omega_ik = np.linalg.inv(Q)  # Convert to information matrix
-        except np.linalg.LinAlgError:
-            Omega_ik = np.zeros_like(Q)
 
-        self.observation_constraints.append((i, k, z_ik, Omega_ik))
+        dx = x_k[0] - x_i[0]
+        dy = x_k[1] - x_i[1]
+        theta = x_i[2]
 
-    
+        # Rotation into the local frame of x_i
+        z_x = cos(theta) * dx + sin(theta) * dy
+        z_y = -sin(theta) * dx + cos(theta) * dy
+
+        return np.array([z_x, z_y])
+
+    @staticmethod
+    def compute_observation_error(x_i, x_k, z_ik):
+        """
+        Compute the residual error between the observed and predicted landmark measurement.
+
+        Parameters:
+        - x_i: np.array of shape (3,), robot pose [x_i, y_i, theta_i]
+        - x_k: np.array of shape (2,), landmark position [x_k, y_k]
+        - z_ik: np.array of shape (2,), observed landmark position in robot frame
+
+        Returns:
+        - e_ik: np.array of shape (2,), residual error in robot frame
+        """
+        z_pred = self.h_observation(x_i, x_k)
+        e_ik = z_ik - z_pred
+        return e_ik
+
+    @staticmethod
+    def dh_dpose(x_i, x_k):
+        """
+        Compute the Jacobian of the observation model h(x_i, x_k) with respect to the robot pose x_i.
+
+        Parameters:
+        - x_i: np.array of shape (3,), robot pose [x_i, y_i, theta_i]
+        - x_k: np.array of shape (2,), landmark position [x_k, y_k]
+
+        Returns:
+        - J: np.array of shape (2, 3), Jacobian matrix
+        """
+        x_i, y_i, theta_i = x_i
+        x_k, y_k = x_k
+
+        dx = x_k - x_i
+        dy = y_k - y_i
+        c = np.cos(theta_i)
+        s = np.sin(theta_i)
+
+        J = np.array([
+            [-c, -s, -s * dx + c * dy],
+            [ s, -c, -c * dx - s * dy]
+        ])
+
+        return J
+
+
     @staticmethod
     def v2t(pose_vec):
         """Convert [x, y, theta] → 3×3 homogeneous transform. """
@@ -341,6 +409,7 @@ class GraphSLAM:
         error[2] = (error[2] + np.pi) % (2 * np.pi) - np.pi
         return error
 
+    @staticmethod
     def compute_jacobians(xi, xj):
         """
         Compute Jacobians A_ij and B_ij for the relative pose constraint between xi and xj.
@@ -392,10 +461,6 @@ class GraphSLAM:
         Follows directly from the derivation in the README.md
         """
 
-        N = len(self.poses)
-        H = np.zeros((3 * N, 3 * N))
-        b = np.zeros((3 * N, ))
-
         for constraint in self.constraints:
             i, j, z_ij, Omega_ij = constraint
 
@@ -429,7 +494,31 @@ class GraphSLAM:
             b[i_idx] += b_i
             b[j_idx] += b_j
 
-        return H, b
+        def linear_system_observations(self):
+            """
+            Add contributions from observation constraints to the linear system H and b.
+            """
+            for i, k, z_ik, Sigma_ik in self.observation_constraints:
+                x_i = self.poses[i]
+                x_k = self.landmarks[k]  # Lookup known landmark position
+
+                # Predicted observation
+                z_pred = self.h_observation(x_i, x_k)
+                e_ik = z_ik - z_pred
+
+                # Jacobian w.r.t pose x_i
+                J_i = self.dh_dpose(x_i, x_k)
+
+                # Information matrix
+                Omega_ik = np.linalg.inv(Sigma_ik)
+
+                # Compute contribution to H and b
+                H_ii = J_i.T @ Omega_ik @ J_i
+                b_i = - J_i.T @ Omega_ik @ e_ik
+
+                i_idx = slice(3 * i, 3 * i + 3)
+                self.H[i_idx, i_idx] += H_ii
+                self.b[i_idx] += b_i
 
     def solve(self, max_iterations=10, tol=1e-4):
         """
@@ -441,17 +530,22 @@ class GraphSLAM:
         for iteration in range(max_iterations):
             print(f"\nIteration {iteration+1}")
 
+            N = len(self.poses)
+            self.H = np.zeros((3 * N, 3 * N))
+            self.b = np.zeros((3 * N, ))
+
             # Build linear system
-            H, b = self.build_linear_system()
+            self.build_linear_system()
+            self.linear_system_observations()
 
             # Apply gauge fixing (anchor first pose)
-            H[0:3, :] = 0
-            H[:, 0:3] = 0
-            H[0:3, 0:3] = np.eye(3)
-            b[0:3] = 0
+            self.H[0:3, :] = 0
+            self.H[:, 0:3] = 0
+            self.H[0:3, 0:3] = np.eye(3)
+            self.b[0:3] = 0
 
             # Solve the system: H Δx = -b
-            delta_x = np.linalg.solve(H, -b)
+            delta_x = np.linalg.solve(self.H, -self.b)
 
             # Apply updates to poses
             for i in range(N):

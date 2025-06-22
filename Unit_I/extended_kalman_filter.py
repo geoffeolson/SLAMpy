@@ -267,7 +267,7 @@ class EKF:
         self.state = self.state + K @ innovation
         self.covariance = (np.eye(3) - K @ H) @ S
 
-        return k, innovation, Q
+        return i, measurement, k, Q
 
 
 
