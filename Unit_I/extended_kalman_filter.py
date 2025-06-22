@@ -1,4 +1,4 @@
-# The full Kalman filter, consisting of prediction and correction step.
+﻿# The full Kalman filter, consisting of prediction and correction step.
 # slam_07_f_kalman_filter
 # You Tube SLAM D17
 # Claus Brenner, 12.12.2012
@@ -207,18 +207,70 @@ class EKF:
 
         return m
 
-    def correct(self, measurement, landmark):
-        """The correction step of the Kalman filter."""
+    # def correct(self, measurement, landmark):
+    #     """The correction step of the Kalman filter."""
+    #     H = self.dh_dstate(self.state, landmark, self.scanner_displacement)
+    #     sigma_r = self.measurement_distance_stddev
+    #     sigma_a = self.measurement_angle_stddev
+    #     Q = diag([sigma_r**2, sigma_a**2])
+    #     S = self.covariance
+    #     K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
+    #     innovation = array(measurement) - self.h(self.state, landmark, self.scanner_displacement)
+    #     innovation[1] = (innovation[1] + pi) % (2*pi) - pi
+    #     self.state = self.state + K @ innovation
+    #     self.covariance = (eye(3) - K @ H) @ S
+
+    # def correct(self, measurement, landmark):
+    #     """The correction step of the Kalman filter."""
+    #     H = self.dh_dstate(self.state, landmark, self.scanner_displacement)
+    #     Sigma_r = self.measurement_distance_stddev
+    #     Sigma_a = self.measurement_angle_stddev
+    #     Q = diag([Sigma_r**2, Sigma_a**2])
+    #     S = self.covariance
+
+    #     z_pred = self.h(self.state, landmark, self.scanner_displacement)  # Predicted measurement
+    #     innovation = array(measurement) - z_pred
+    #     innovation[1] = (innovation[1] + pi) % (2*pi) - pi
+
+    #     K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
+    #     self.state = self.state + K @ innovation
+    #     self.covariance = (eye(3) - K @ H) @ S
+
+    #     return z_pred, Q  # Return predicted measurement and its covariance
+
+    def correct(self, measurement, landmark, k):
+        """
+        Perform EKF correction and return observation residual and noise.
+
+        Args:
+            measurement: Observed range and bearing (z_ik).
+            landmark: Landmark position (x_k, y_k).
+            k: Landmark index.
+
+        Returns:
+            (k, z_ik, Q): A tuple with:
+                k: Landmark index.
+                z_ik: Innovation (residual) = z - h(x_i, k).
+                Q: Measurement noise covariance matrix (2x2).
+        """
+        z_pred = self.h(self.state, landmark, self.scanner_displacement)  # Predicted measurement
+        innovation = np.array(measurement) - z_pred
+        innovation[1] = (innovation[1] + np.pi) % (2 * np.pi) - np.pi  # Normalize angle
+
         H = self.dh_dstate(self.state, landmark, self.scanner_displacement)
+        S = self.covariance
         sigma_r = self.measurement_distance_stddev
         sigma_a = self.measurement_angle_stddev
-        Q = diag([sigma_r**2, sigma_a**2])
-        S = self.covariance
-        K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
-        innovation = array(measurement) - self.h(self.state, landmark, self.scanner_displacement)
-        innovation[1] = (innovation[1] + pi) % (2*pi) - pi
+        Q = np.diag([sigma_r**2, sigma_a**2])
+        K = S @ H.T @ np.linalg.inv(H @ S @ H.T + Q)
+
         self.state = self.state + K @ innovation
-        self.covariance = (eye(3) - K @ H) @ S
+        self.covariance = (np.eye(3) - K @ H) @ S
+
+        return k, innovation, Q
+
+
+
 
 if __name__ == '__main__':
     os.chdir("Unit_I")

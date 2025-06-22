@@ -258,6 +258,24 @@ class GraphSLAM:
         Ω_ij = self.compute_information_matrix(Σ_ij)
 
         self.constraints.append((i, i + 1, x_ij, Ω_ij))
+
+    def add_observation_constraint(self, i, k, z_ik, Q):
+        """
+        Add an observation constraint between pose i and landmark k.
+
+        Args:
+            i: Pose index in the graph.
+            k: Landmark index (or unique ID).
+            z_ik: Measurement residual (z - h(x_i, k)), shape (2,)
+            Q: Measurement covariance matrix (2x2)
+        """
+        try:
+            Omega_ik = np.linalg.inv(Q)  # Convert to information matrix
+        except np.linalg.LinAlgError:
+            Omega_ik = np.zeros_like(Q)
+
+        self.observation_constraints.append((i, k, z_ik, Omega_ik))
+
     
     @staticmethod
     def v2t(pose_vec):
