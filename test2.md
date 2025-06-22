@@ -3,33 +3,36 @@
 Observation constraints relate a robot pose $x_i = (x_i, y_i, \theta_i)$ to a known landmark position $l_k = (l_{kx}, l_{ky})$. The expected observation is the displacement vector in rectangular coordinates from the robot to the landmark, as measured from the scanner frame.
 
 Let the scanner position be:
+
 $$
 (x_s, y_s) = (x_i + d \cos(\theta_i),\ y_i + d \sin(\theta_i))
 $$
 
 Then the predicted observation $\mathbf{z}_{ik}$ is:
+
 $$
-\mathbf{z}_{ik} = \begin{bmatrix}
-l_{kx} - x_s \\
-l_{ky} - y_s
+mathbf{z}\_{ik} = \begin{bmatrix}
+l\_{kx} - x_s \\
+l\_{ky} - y_s
 \end{bmatrix}
-=
+\=
 \begin{bmatrix}
-l_{kx} - x_i - d \cos(\theta_i) \\
-l_{ky} - y_i - d \sin(\theta_i)
+l\_{kx} - x_i - d \cos(\theta_i) \\
+l\_{ky} - y_i - d \sin(\theta_i)
 \end{bmatrix}
 $$
 
-Let the actual observation be denoted as $\mathbf{z}_{ik}^{\text{meas}}$ (e.g., as returned from the EKF).
+Let the actual observation be denoted as $\mathbf{z}\_{ik}^{\text{meas}}$ (e.g., as returned from the EKF).
 
 The residual error is defined as:
+
 $$
-\mathbf{e}_{ik} = \mathbf{z}_{ik}^{\text{meas}} - \mathbf{z}_{ik}
+\mathbf{e}\_{ik} = \mathbf{z}\_{ik}^{\text{meas}} - \mathbf{z}\_{ik}
 $$
 
 #### Jacobian $A_i = \frac{\partial \mathbf{e}_{ik}}{\partial \mathbf{x}_i}$
 
-This Jacobian describes how the observation error changes with respect to pose $x_i = (x_i, y_i, \theta_i)$. It is a 2×3 matrix:
+This Jacobian describes how the observation error changes with respect to pose $x_i = (x_i, y_i, \theta_i)$. It is a 2Ã—3 matrix:
 
 $$
 A_i = \begin{bmatrix}
