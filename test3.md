@@ -6,15 +6,34 @@ Each observation provides a constraint between a robot pose $\mathbf{x}\_i$ and 
 
 #### Definitions
 
-Let:
+Let this be the robot pose at time $i$:
 
-- $\mathbf{x}\_i = \begin{bmatrix} x\_i \\ 
+$$
+\mathbf{x}\_i = \begin{bmatrix} 
+x\_i \\ 
 y\_i \\ 
-\theta\_i \end{bmatrix}$ be the robot pose at time $i$
-- $\mathbf{l}\_k = \begin{bmatrix} x\_k \\ 
-y\_k \end{bmatrix}$ be the position of landmark $k$
-- $\mathbf{z}\_{ik} = \begin{bmatrix} \Delta x \\ 
-\Delta y \end{bmatrix}$ be the observed relative position from pose $i$ to landmark $k$, in the robot's reference frame
+\theta\_i 
+\end{bmatrix}
+$$
+
+let this be the position of landmark $k$
+
+$$
+\mathbf{l}\_k = \begin{bmatrix} 
+x\_k \\ 
+y\_k 
+\end{bmatrix}
+$$ 
+
+Let this be the observed relative position from pose $i$ to landmark $k$, in the robot's reference frame:
+
+$$
+\mathbf{z}\_{ik} = 
+\begin{bmatrix} 
+\Delta x \\ 
+\Delta y 
+\end{bmatrix}
+$$ 
 
 The expected observation $\hat{\mathbf{z}}\_{ik}$ is computed by:
 
@@ -22,11 +41,14 @@ $$
 \hat{\mathbf{z}}\_{ik} = R(\theta\_i)^\top \cdot \left( \mathbf{l}\_k - \mathbf{t}\_i \right)
 $$
 
-where:
+where: 
 
-- $\mathbf{t}\_i = \begin{bmatrix} x\_i \\ 
-y\_i \end{bmatrix}$ is the translation part of pose $\mathbf{x}\_i$
-- $R(\theta\_i)$ is the 2D rotation matrix:
+$$
+\mathbf{t}\_i = \begin{bmatrix} x\_i \\ 
+y\_i \end{bmatrix}
+$$ 
+
+is the translation part of pose $\mathbf{x}\_i$ and $R(\theta\_i)$ is the 2D rotation matrix:
 
 $$
 R(\theta\_i) = 
@@ -58,10 +80,8 @@ Let:
 Then the Jacobian is:
 
 $$
-\mathbf{J}\_{ik} =
-\frac{\partial \mathbf{e}\_{ik}}{\partial \mathbf{x}\_i} =
-\begin{bmatrix}
-- c & - s & - s \cdot \Delta x + c \cdot \Delta y \\
+\mathbf{J}\_{ik} = \frac{\partial \mathbf{e}\_{ik}}{\partial \mathbf{x}\_i} = \begin{bmatrix}
+\-c & - s & - s \cdot \Delta x + c \cdot \Delta y \\
 s & - c & - c \cdot \Delta x - s \cdot \Delta y
 \end{bmatrix}
 $$
