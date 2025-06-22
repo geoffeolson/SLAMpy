@@ -1,3 +1,4 @@
+$\mathrel{\+\=}$
 ## A Simple Graph-Based SLAM
 
 This document explains the derivation of the Jacobians used in a simple Graph-Based SLAM implementation. It includes pose definitions, matrix notation, and the role of Jacobians in constructing the linear system for optimization.
@@ -375,13 +376,13 @@ Each observation constraint contributes to the linear system:
 - Jacobian $\mathbf{J}\_{ik}$ is used to form the local information matrix:
 
 $$
-\mathbf{H}\_{ii} += \mathbf{J}\_{ik}^\top \, \Omega\_{ik} \, \mathbf{J}\_{ik}
+\mathbf{H}\_{ii} \mathrel{\+\=} \mathbf{J}\_{ik}^\top \, \Omega\_{ik} \, \mathbf{J}\_{ik}
 $$
 
 - And the right-hand side vector:
 
 $$
-\mathbf{b}\_i += \mathbf{J}\_{ik}^\top \, \Omega\_{ik} \, \mathbf{e}\_{ik}
+\mathbf{b}\_i \mathrel{\+\=} \mathbf{J}\_{ik}^\top \, \Omega\_{ik} \, \mathbf{e}\_{ik}
 $$
 
 Here $\Omega\_{ik} = \Sigma\_{ik}^{-1}$ is the information matrix associated with the measurement noise.
