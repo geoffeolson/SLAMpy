@@ -11,211 +11,6 @@ from numpy import pi, sin, cos, pi, atan2
 import numpy as np
 import os
 
-# def v2t(pose_vec):
-#     """Convert [x, y, theta] → 3×3 homogeneous transform. """
-#     x, y, theta = pose_vec
-#     cos_theta = np.cos(theta)
-#     sin_theta = np.sin(theta)
-#     T = np.array([
-#         [cos_theta, -sin_theta, x],
-#         [sin_theta,  cos_theta, y],
-#         [0,          0,         1]
-#     ])
-#     return T
-
-# def t2v(T):
-#     """Convert 3×3 homogeneous transform → [x, y, theta]."""
-#     x = T[0, 2]
-#     y = T[1, 2]
-#     theta = np.arctan2(T[1, 0], T[0, 0])
-#     return np.array([x, y, theta])
-
-
-# class ExtendedKalmanFilter:
-#     def __init__(self, state, covariance,
-#                  robot_width,
-#                  control_motion_factor, control_turn_factor):
-#         # The state. This is the core data of the Kalman filter.
-#         self.state = state
-#         self.covariance = covariance
-
-#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-#         self.last_relative_motion = np.zeros(3)
-#         self.last_motion_covariance = None
-#         # <<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
-
-#         # Some constants.
-#         self.robot_width = robot_width
-#         self.control_motion_factor = control_motion_factor
-#         self.control_turn_factor = control_turn_factor
-
-#     @staticmethod
-#     def g(state, control, w):
-#         x, y, theta = state
-#         l, r = control
-#         if r != l:
-#             alpha = (r - l) / w
-#             rad = l/alpha
-#             g1 = x + (rad + w/2.)*( sin(theta+alpha) - sin(theta))
-#             g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
-#             g3 = (theta + alpha + pi) % (2*pi) - pi
-#         else:
-#             g1 = x + l * cos(theta)
-#             g2 = y + l * sin(theta)
-#             g3 = theta
-
-#         return np.array([g1, g2, g3])
-
-#     @staticmethod
-#     def dg_dstate(state, control, w):
-#         theta = state[2]
-#         l, r = control
-#         if r != l:
-#             # This is for the case r != l.
-#             # g has 3 components and the state has 3 components, so the
-#             # derivative of g with respect to all state variables is a
-#             # 3x3 matrix. To construct such a matrix in Python/Numpy,
-#             # use: m = array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
-#             # where 1, 2, 3 are the values of the first row of the matrix.
-#             # Don't forget to return this matrix.
-#             alpha = (r - l) / w
-#             rad = l/alpha
-#             dg1_dtheta = (rad + w/2.)*(cos(theta+alpha) - cos(theta))
-#             dg2_dtheta = (rad + w/2.)*(sin(theta+alpha) - sin(theta))
-
-#         else:
-#             # This is for the special case r == l.
-#             dg1_dtheta = -l*sin(theta)
-#             dg2_dtheta =  l*cos(theta)
-
-#         # The derivative of g with respect to x, y and theta is a 3x3 matrix.
-#         m = np.array([
-#             [1, 0, dg1_dtheta], 
-#             [0, 1, dg2_dtheta], 
-#             [0, 0, 1]])
-
-#         return m
-
-#     @staticmethod
-#     def dg_dcontrol(state, control, w):
-#         x, y, theta = state
-#         l, r = tuple(control)
-
-#         if r != l:
-#             # --->>> Put your code here.
-#             # This is for the case l != r.
-#             # Note g has 3 components and control has 2, so the result
-#             # will be a 3x2 (rows x columns) matrix.
-#             alpha = (r - l) / w
-#             theta2 = theta + alpha
-#             dg1_dl =  w*r/((r-l)**2) * ( sin(theta2)-sin(theta)) - (r+l)/(2*(r-l)) * cos(theta2)
-#             dg2_dl =  w*r/((r-l)**2) * (-cos(theta2)+cos(theta)) - (r+l)/(2*(r-l)) * sin(theta2)
-#             dg3_dl = -1/w
-#             dg1_dr = -w*l/((r-l)**2) * ( sin(theta2)-sin(theta)) + (r+l)/(2*(r-l)) * cos(theta2)
-#             dg2_dr = -w*l/((r-l)**2) * (-cos(theta2)+cos(theta)) + (r+l)/(2*(r-l)) * sin(theta2)
-#             dg3_dr = 1/w
-            
-#         else:
-#             dg1_dl = 0.5 * (cos(theta) + (l/w) * sin(theta))
-#             dg2_dl = 0.5 * (sin(theta) - (l/w) * cos(theta))
-#             dg3_dl = -1/w
-#             dg1_dr = 0.5 * (cos(theta) - (l/w) * sin(theta))
-#             dg2_dr = 0.5 * (sin(theta) + (l/w) * cos(theta))
-#             dg3_dr = 1/w           
-
-#         m = np.array([
-#             [dg1_dl, dg1_dr], 
-#             [dg2_dl, dg2_dr], 
-#             [dg3_dl, dg3_dr]])
-            
-#         return m
-
-#     @staticmethod
-#     def get_error_ellipse(covariance):
-#         """Return the position covariance (which is the upper 2x2 submatrix)
-#            as a triple: (main_axis_angle, stddev_1, stddev_2), where
-#            main_axis_angle is the angle (pointing direction) of the main axis,
-#            along which the standard deviation is stddev_1, and stddev_2 is the
-#            standard deviation along the other (orthogonal) axis."""
-#         eigenvals, eigenvects = linalg.eig(covariance[0:2,0:2])
-#         angle = atan2(eigenvects[1,0], eigenvects[0,0])
-#         return (angle, sqrt(eigenvals[0]), sqrt(eigenvals[1]))        
-
-#     def predict_old(self, control):
-#         """The prediction step of the Kalman filter."""
-#         # covariance' = G * covariance * GT + R
-#         # where R = V * (covariance in control space) * VT.
-#         # Covariance in control space depends on move distance.
-#         left, right = control
-#         a1 = self.control_motion_factor
-#         a2 = self.control_turn_factor
-#         Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
-#         Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
-#         sigma_control = np.diag([Gl2, Gr2])
-#         Vt = self.dg_dcontrol(self.state, control, self.robot_width)
-#         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
-#         Gt = self.dg_dstate(self.state, control, self.robot_width)
-#         self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
-
-#         # state' = g(state, control)
-#         self.state = self.g(self.state, control, self.robot_width)
-
-#     #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-#     def get_last_relative_motion(self):
-#         return self.last_relative_motion
-
-#     def get_last_motion_covariance(self):
-#         return self.last_motion_covariance
-#     #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
-
-#     def predict(self, control):
-#         """The prediction step of the Kalman filter."""
-
-#         # Store previous state for relative motion
-#         x_prev = self.state.copy()
-
-#         # 1. Predict covariance
-#         left, right = control
-#         a1 = self.control_motion_factor
-#         a2 = self.control_turn_factor
-#         Gl2 = (a1 * left)**2 + (a2 * (left - right))**2
-#         Gr2 = (a1 * right)**2 + (a2 * (left - right))**2
-#         sigma_control = np.diag([Gl2, Gr2])
-
-#         Vt = self.dg_dcontrol(self.state, control, self.robot_width)
-        
-    
-    
-#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-#         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
-#         self.last_motion_covariance = Rt
-#         #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
-
-#         Gt = self.dg_dstate(self.state, control, self.robot_width)
-#         self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
-
-#         # 2. Predict new state
-#         x_curr = self.g(self.state, control, self.robot_width)
-#         self.state = x_curr
-
-#         # 3. Compute relative motion in the local frame of x_prev
-#         dx = x_curr[0] - x_prev[0]
-#         dy = x_curr[1] - x_prev[1]
-#         dtheta = x_curr[2] - x_prev[2]
-#         theta = x_prev[2]
-
-#         # Rotate into local frame of x_prev
-#         rot_dx = cos(-theta) * dx - sin(-theta) * dy
-#         rot_dy = sin(-theta) * dx + cos(-theta) * dy
-#         rot_dtheta = (dtheta + pi) % (2 * pi) - pi
-
-        
-#         #>>>>>>>>>>>>>>UNTESTED>>>>>>>>>>>>>>>.
-#         # 4. Store the result
-#         self.last_relative_motion = np.array([rot_dx, rot_dy, rot_dtheta])
-#         #<<<<<<<<<<<<<<END UNTESTED<<<<<<<<<<<<<<
-
-
 class GraphSLAM:
     def __init__(self):
         self.landmarks = []                  # List of 2D landmark positions [x, y]
@@ -242,40 +37,16 @@ class GraphSLAM:
         except np.linalg.LinAlgError:
             return np.zeros_like(Sigma_ij)
 
-    def add_motion_constraint(self, x_j, Sigma_ij):
+    def add_motion_constraint(self, i, x_i, x_j, Sigma_ij):
         """
         Add a motion constraint between the last pose and the new pose x_j.
         Automatically computes x_ij and Ω_ij internally.
         """
         i = len(self.poses) - 1
-        self.poses.append(x_j)
-
-        if i < 0:
-            # First pose, nothing to constrain yet.
-            return
-
-        x_i = self.poses[i]
         x_ij = self.compute_relative_pose(x_i, x_j)
         Omega_ij = self.compute_information_matrix(Sigma_ij)
 
-        self.constraints.append((i, i + 1, x_ij, Omega_ij))
-
-    # def add_observation_constraint(self, i, k, z_ik, Sigma_ik):
-    #     """
-    #     Add an observation constraint between pose i and landmark k.
-
-    #     Args:
-    #         i: Pose index in the graph.
-    #         k: Landmark index (or unique ID).
-    #         z_ik: Measurement residual (z - h(x_i, k)), shape (2,)
-    #         Q: Measurement covariance matrix (2x2)
-    #     """
-    #     try:
-    #         Omega_ik = np.linalg.inv(Sigma_ik)  # Convert to information matrix
-    #     except np.linalg.LinAlgError:
-    #         Omega_ik = np.zeros_like(Sigma_ik)
-
-    #     self.observation_constraints.append((i, k, z_ik, Omega_ik))
+        self.constraints.append((i, i+1, x_ij, Omega_ij))
 
     @staticmethod
     def h_observation(x_i, x_k):
@@ -283,8 +54,8 @@ class GraphSLAM:
         Predicts the observation of landmark k from pose i in rectangular coordinates.
 
         Parameters:
-        - x_i: ndarray of shape (3,), the robot pose [x, y, θ]
-        - x_k: ndarray of shape (2,), the landmark position [x, y]
+        - x_i: ndarray of shape (3,), the global robot pose [x, y, θ]
+        - x_k: ndarray of shape (2,), the global landmark point [x, y]
 
         Returns:
         - z_ik_pred: ndarray of shape (2,), the predicted observation in local frame
@@ -306,15 +77,15 @@ class GraphSLAM:
         Compute the residual error between the observed and predicted landmark measurement.
 
         Parameters:
-        - x_i: np.array of shape (3,), robot pose [x_i, y_i, theta_i]
-        - x_k: np.array of shape (2,), landmark position [x_k, y_k]
-        - z_ik: np.array of shape (2,), observed landmark position in robot frame
+        - x_i: np.array of shape (3,), global robot pose [x_i, y_i, theta_i]
+        - x_k: np.array of shape (2,), global landmark position [x_k, y_k]
+        - z_ik: np.array of shape (2,), local observed landmark position in robot frame
 
         Returns:
-        - e_ik: np.array of shape (2,), residual error in robot frame
+        - e_ik: np.array of shape (2,), z_ik local observation error in robot frame
         """
-        z_pred = self.h_observation(x_i, x_k)
-        e_ik = z_ik - z_pred
+        z_ik_pred = self.h_observation(x_i, x_k) # predicted z_ik
+        e_ik = z_ik - z_ik_pred # z_ik error
         return e_ik
 
     @staticmethod
@@ -378,7 +149,7 @@ class GraphSLAM:
         """
         self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
 
-    def add_observation_constraint(self, pose_index, landmark_index, z_ij, Omega_ij):
+    def add_observation_constraint(self, pose_index, measurment, landmark, Omega_ij):
         """
         Add an observation constraint between a pose and a landmark.
     
@@ -387,7 +158,7 @@ class GraphSLAM:
         z_ij: Measured observation from the pose to the landmark (in the robot's local frame).
         Omega_ij: 2x2 or 3x3 information matrix of the observation (inverse of covariance).
         """
-        self.observation_constraints.append((pose_index, landmark_index, np.array(z_ij), np.array(Omega_ij)))
+        self.observation_constraints.append((pose_index, np.array(measurment), np.array(landmark), np.array(Omega_ij)))
 
     def compute_error(self, constraint):
         """
@@ -498,7 +269,7 @@ class GraphSLAM:
             """
             Add contributions from observation constraints to the linear system H and b.
             """
-            for i, k, z_ik, Sigma_ik in self.observation_constraints:
+            for i, z_ik, x_k, Sigma_ik in self.observation_constraints:
                 x_i = self.poses[i]
                 x_k = self.landmarks[k]  # Lookup known landmark position
 

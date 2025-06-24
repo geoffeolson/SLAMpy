@@ -1,0 +1,15 @@
+{
+  "initial_state": [ 1850.0, 1897.0, 213.0 ],
+  "covariance": [ 100.0, 100.0, 10.0 ],
+  "ticks_to_mm": 0.349,
+  "cylinder_offset": 90.0,
+  "depth_jump": 100.0,
+  "minimum_valid_distance": 20.0,
+  "max_cylinder_distance": 300.0,
+  "robot_width": 155.0,
+  "scanner_displacement": 30.0,
+  "control_motion_factor": 0.35,
+  "control_turn_factor": 0.6,
+  "measurement_distance_stddev": 200.0,
+  "measurement_angle_stddev": 0.2617993877991494
+}

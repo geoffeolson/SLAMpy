@@ -28,8 +28,10 @@ class System:
 
             # Odometry
             control = np.array(logfile.motor_ticks[i]) * self.ekf.ticks_to_mm
-            x_i, x_j, Sigma_ij = self.ekf.predict(control)
-            self.graph_slam.add_motion_constraint(x_j, Sigma_ij)
+            prev_state = self.ekf.state
+            x_i, x_j, sigma_ij = self.ekf.predict(control)
+            motion = self.ekf.state - prev_state
+            self.graph_slam.add_motion_constraint(i, x_i, x_j, sigma_ij)
             self.states.append(self.ekf.state)
             self.covariances.append(self.ekf.covariance)
 
@@ -40,10 +42,18 @@ class System:
                 self.ekf.state, self.ekf.scanner_displacement,
                 reference_cylinders, self.ekf.max_cylinder_distance)
             self.matched_ref_cylinders.append([m[1] for m in observations])
-            for obs in observations:
-                pose_index, z_ik, landmark_index, Sigma_ik = obs
-                self.ekf.correct(pose_index, z_ik, landmark_index, Sigma_ik)
-                self.graph_slam.add_observation_constraint(pose_index, landmark_index, z_ik, Sigma_ik)
+
+            for j in range(len(observations)):
+                measurment, landmark = observations[j]
+                Q = self.ekf.correct(measurment, landmark)
+                self.graph_slam.add_pose(self.state)
+                self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
+
+
+            # for obs in observations:
+            #     pose_index, z_ik, landmark_index, Sigma_ik = obs
+            #     self.ekf.correct(pose_index, z_ik, landmark_index, Sigma_ik)
+            #     self.graph_slam.add_observation_constraint(pose_index, landmark_index, z_ik, Sigma_ik)
 
     def write_ekf_results(self, filename="Results_EKF.txt"):
         from math import sqrt, cos, sin
@@ -66,50 +76,50 @@ class System:
                 f.write(f"F {x} {y} {θ}\n")
         print(f"Wrote {len(self.graph_slam.poses)} poses and constraints to {filename}")
 
-def lego_robot_test():
+def lego_robot_test(data_dir):
 
     #Initialize EKF
-    config_json = """
-    {
-        "ticks_to_mm": 0.349,
-        "cylinder_offset": 90.0,
-        "depth_jump": 100.0,
-        "minimum_valid_distance": 20.0,
-        "max_cylinder_distance": 300.0,
-        "robot_width": 155.0,
-        "scanner_displacement": 30.0,
-        "control_motion_factor": 0.35,
-        "control_turn_factor": 0.6,
-        "measurement_distance_stddev": 200.0,
-        "measurement_angle_stddev": 0.2617993877991494
-    }
-    """
-    config = json.loads(config_json)
-    initial_state = np.array([1850.0, 1897.0, 213.0 / 180.0 * np.pi])
-    initial_covariance = np.diag([100.0**2, 100.0**2, (10.0 / 180.0 * np.pi) ** 2])
-    ekf = EKF(initial_state.copy(), initial_covariance, 0, 0, 0, 0, 0, 0)  # dummy values
-    ekf.read_json(config)
+    ekf = EKF()  # dummy values
+    ekf.load_json(os.path.join(data_dir,"config.json"))
 
     #Initialize Graph SLAM
     graph_slam = GraphSLAM()
-    graph_slam.add_pose(initial_state.copy())
+    graph_slam.add_pose(ekf.state.copy())
     
     # Read Robot Data
     logfile = LegoLogfile()
-    logfile.read("robot4_motors.txt")
-    logfile.read("robot4_scan.txt")
-    logfile.read("robot_arena_landmarks.txt")
+    logfile.read(os.path.join(data_dir,"robot4_motors.txt"))
+    logfile.read(os.path.join(data_dir,"robot4_scan.txt"))
+    logfile.read(os.path.join(data_dir,"robot_arena_landmarks.txt"))
 
     # Run Main Sytyem
     system = System(ekf, graph_slam)
     system.run(logfile)
-    system.write_ekf_results("Results_EKF.txt")
-    system.write_graph_slam_results("Results_Graph_Slam.txt")
+    system.write_ekf_results(os.path.join(data_dir,"results_ekf.txt"))
+    system.write_graph_slam_results(os.path.join(data_dir,"results_graph_slam.txt"))
 
 
 if __name__ == '__main__':
-        # Get the directory of the current script
-    python_file_directory = os.path.dirname(os.path.abspath(__file__))
-    print("Current Directory " + os.chdir(python_file_directory))
-    lego_robot_test()
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    lego_robot_test("Data/LegoRobot")
+
+
+##############################################
+#   DEPRICATED
+##############################################
+    # config_json = """
+    # {
+    #     "ticks_to_mm": 0.349,
+    #     "cylinder_offset": 90.0,
+    #     "depth_jump": 100.0,
+    #     "minimum_valid_distance": 20.0,
+    #     "max_cylinder_distance": 300.0,
+    #     "robot_width": 155.0,
+    #     "scanner_displacement": 30.0,
+    #     "control_motion_factor": 0.35,
+    #     "control_turn_factor": 0.6,
+    #     "measurement_distance_stddev": 200.0,
+    #     "measurement_angle_stddev": 0.2617993877991494
+    # }
+    # """
 

@@ -11,13 +11,10 @@ import os
 import json
 
 class EKF:
-    def __init__(self, state, covariance,
-                 robot_width, scanner_displacement,
-                 control_motion_factor, control_turn_factor,
-                 measurement_distance_stddev, measurement_angle_stddev):
+    def __init__(self):
         # The state. This is the core data of the Kalman filter.
-        self.state = state
-        self.covariance = covariance
+        # self.state = state
+        # self.covariance = covariance
 
         # Some constants.
         self.ticks_to_mm = 0.349
@@ -25,15 +22,23 @@ class EKF:
         self.depth_jump = 100.0
         self.minimum_valid_distance = 20.0
         self.max_cylinder_distance = 300.0
-        self.robot_width = robot_width
-        self.scanner_displacement = scanner_displacement
-        self.control_motion_factor = control_motion_factor
-        self.control_turn_factor = control_turn_factor
-        self.measurement_distance_stddev = measurement_distance_stddev
-        self.measurement_angle_stddev = measurement_angle_stddev
+        self.robot_width = 155.0
+        self.scanner_displacement = 30.0
+        self.control_motion_factor = 0.35
+        self.control_turn_factor = 0.6
+        self.measurement_distance_stddev = 200.0
+        self.measurement_angle_stddev = 0.2617993877991494
+
+    def load_json(self, json_filename):
+        with open(json_filename, 'r') as f:
+            self.read_json(json.load(f))
 
     def read_json(self, json_obj):
         """Initialize EKF constants from a JSON object (dict)."""
+        self.state = np.array(json_obj["initial_state"])
+        self.state[2] *= pi/180
+        S = np.array(json_obj["covariance"])
+        self.covariance = np.diag([S[0]**2, S[1]**2, (S[2] * pi / 180)**2])
         self.ticks_to_mm = json_obj["ticks_to_mm"]
         self.cylinder_offset = json_obj["cylinder_offset"]
         self.depth_jump = json_obj["depth_jump"]
@@ -163,10 +168,9 @@ class EKF:
         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
         Gt = self.dg_dstate(self.state, control, self.robot_width)
         self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
-        x_prev = self.state.copy()
-        x_curr = self.g(self.state, control, self.robot_width)
-        self.state = x_curr
-        return (x_prev, x_curr, Rt)
+        prev_state = self.state
+        self.state = self.g(self.state, control, self.robot_width)
+        return prev_state, self.state, Rt
 
     @staticmethod
     def h(state, landmark, scanner_displacement):
@@ -238,7 +242,7 @@ class EKF:
 
     #     return z_pred, Q  # Return predicted measurement and its covariance
 
-    def correct(self, measurement, landmark, k):
+    def correct(self, measurement, landmark):
         """
         Perform EKF correction and return observation residual and noise.
 
@@ -263,11 +267,9 @@ class EKF:
         sigma_a = self.measurement_angle_stddev
         Q = np.diag([sigma_r**2, sigma_a**2])
         K = S @ H.T @ np.linalg.inv(H @ S @ H.T + Q)
-
         self.state = self.state + K @ innovation
         self.covariance = (np.eye(3) - K @ H) @ S
-
-        return i, measurement, k, Q
+        return Q
 
 
 
