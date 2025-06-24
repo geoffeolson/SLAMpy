@@ -1,6 +1,20 @@
-L C 1291.0	1881.0	55.0
-L C 482.0	682.0	55.0
-L C 1191.0	747.0	55.0
-L C 1693.0	1043.0	55.0
-L C 383.0	1458.0	55.0
-L C 1805.0	190.0	55.0
+1. What about the sign of dh_dpose
+Jacobian should b de_dpose = -dh_dpose
+
+def liniar_system_observations
+ # Jacobian w.r.t pose x_i
+ J_i = self.dh_dpose(x_i, x_k)
+
+ # Information matrix
+ Omega_ik = np.linalg.inv(Sigma_ik)
+
+ # Compute contribution to H and b
+ H_ii = J_i.T @ Omega_ik @ J_i
+ b_i = - J_i.T @ Omega_ik @ e_ik
+ 
+ 
+2. What about the Sigma for observations used in GraphSLAM
+
+ sigma_r = self.measurement_distance_stddev
+ sigma_a = self.measurement_angle_stddev
+ Q = np.diag([sigma_r**2, sigma_a**2])
