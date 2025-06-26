@@ -271,7 +271,7 @@ class GraphSLAM:
             """
             for i, z_ik, x_k, Sigma_ik in self.observation_constraints:
                 x_i = self.poses[i]
-                x_k = self.landmarks[k]  # Lookup known landmark position
+                #x_k = self.landmarks[k]  # Lookup known landmark position
 
                 # Predicted observation
                 z_pred = self.h_observation(x_i, x_k)
