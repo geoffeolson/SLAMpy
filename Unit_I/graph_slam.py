@@ -5,7 +5,7 @@ This version supports adding fixed 2D poses and relative pose constraints,
 computing residuals, and preparing for Gauss-Newton optimization.
 """
 from scipy.stats import sigmaclip
-from Unit_I.extended_kalman_filter import EKF
+from extended_kalman_filter import EKF
 from lego_robot import *
 import numpy as np
 from numpy import pi, sin, cos, pi, atan2

@@ -24,8 +24,14 @@ class System:
     # Main System Loop
     def run(self, logfile):
         reference_cylinders = [l[1:3] for l in logfile.landmarks]
+        ##########################################################################
+        logfile.motor_ticks = [(500.0,500.0),(500.0,500.0),(500.0,500.0),(500.0,500.0)]
+        obs =  [[(( 1118.033989, 0.463647609 ),( 1500.0, 500.0)),
+                 (( 1118.033989,-0.463647609 ),( 1500.0,-500.0))],
+                [(( 707.1067812, 0.7853981634),( 1500.0, 500.0)),
+                 (( 707.1067812,-0.7853981634),( 1500.0,-500.0))]]
+        ########################################################################
         for i in range(len(logfile.motor_ticks)):
-
             # Odometry
             control = np.array(logfile.motor_ticks[i]) * self.ekf.ticks_to_mm
             prev_state = self.ekf.state
@@ -41,13 +47,17 @@ class System:
                 self.ekf.depth_jump, self.ekf.minimum_valid_distance, self.ekf.cylinder_offset,
                 self.ekf.state, self.ekf.scanner_displacement,
                 reference_cylinders, self.ekf.max_cylinder_distance)
+            ######################################################################################
+            observations = obs[i]
+            #######################################################################################
             self.matched_ref_cylinders.append([m[1] for m in observations])
 
             for j in range(len(observations)):
                 measurment, landmark = observations[j]
                 Q = self.ekf.correct(measurment, landmark)
-                self.graph_slam.add_pose(self.state)
+                self.graph_slam.add_pose(self.ekf.state)
                 self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
+                print('hey')
 
     def write_ekf_results(self, filename="Results_EKF.txt"):
         from math import sqrt, cos, sin
@@ -96,7 +106,7 @@ def lego_robot_test(data_dir):
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    lego_robot_test("Data/LegoRobot")
+    lego_robot_test("Data/TestCase1")
 
 
 ##############################################

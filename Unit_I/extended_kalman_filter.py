@@ -27,6 +27,7 @@ class EKF:
         self.control_turn_factor = 0.6
         self.measurement_distance_stddev = 200.0
         self.measurement_angle_stddev = 0.2617993877991494
+        self.observations = []
 
     def load_json(self, json_filename):
         with open(json_filename, 'r') as f:
@@ -49,6 +50,12 @@ class EKF:
         self.control_turn_factor = json_obj["control_turn_factor"]
         self.measurement_distance_stddev = json_obj["measurement_distance_stddev"]
         self.measurement_angle_stddev = json_obj["measurement_angle_stddev"]
+        # observations = json_obj["observations"]
+        # self.observations = []
+        # for obs in observations:
+        #     a, b = obs
+        #     self.observations.append(((a[0],a[1]),(b[0],b[1])))
+
 
     def write_json(self):
         """Export EKF constants to a JSON-compatible dict."""
