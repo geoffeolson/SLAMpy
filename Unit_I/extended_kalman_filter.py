@@ -11,10 +11,9 @@ import os
 import json
 
 class EKF:
+    scanner_displacement = 30.0
+
     def __init__(self):
-        # The state. This is the core data of the Kalman filter.
-        # self.state = state
-        # self.covariance = covariance
 
         # Some constants.
         self.ticks_to_mm = 0.349
@@ -54,6 +53,16 @@ class EKF:
     def write_json(self):
         """Export EKF constants to a JSON-compatible dict."""
         return {
+            "initial_state": [
+                float(self.state[0]),
+                float(self.state[1]),
+                float(self.state[2] * 180 / pi)
+            ],
+            "covariance": [
+                float(np.sqrt(self.covariance[0, 0])),
+                float(np.sqrt(self.covariance[1, 1])),
+                float(np.sqrt(self.covariance[2, 2]) * 180 / pi)
+            ],
             "ticks_to_mm": self.ticks_to_mm,
             "cylinder_offset": self.cylinder_offset,
             "depth_jump": self.depth_jump,
@@ -65,7 +74,7 @@ class EKF:
             "control_turn_factor": self.control_turn_factor,
             "measurement_distance_stddev": self.measurement_distance_stddev,
             "measurement_angle_stddev": self.measurement_angle_stddev
-    }
+        }
 
     @staticmethod
     def g(state, control, w):
@@ -189,7 +198,6 @@ class EKF:
         x, y, theta = state
         xm, ym = landmark
         d = scanner_displacement
-        # --->>> Insert your code here.
         # Note that:
         # x y theta is state[0] state[1] state[2]
         # x_m y_m is landmark[0] landmark[1]
@@ -210,37 +218,6 @@ class EKF:
             [da_dx, da_dy, da_dtheta]])
 
         return m
-
-    # def correct(self, measurement, landmark):
-    #     """The correction step of the Kalman filter."""
-    #     H = self.dh_dstate(self.state, landmark, self.scanner_displacement)
-    #     sigma_r = self.measurement_distance_stddev
-    #     sigma_a = self.measurement_angle_stddev
-    #     Q = diag([sigma_r**2, sigma_a**2])
-    #     S = self.covariance
-    #     K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
-    #     innovation = array(measurement) - self.h(self.state, landmark, self.scanner_displacement)
-    #     innovation[1] = (innovation[1] + pi) % (2*pi) - pi
-    #     self.state = self.state + K @ innovation
-    #     self.covariance = (eye(3) - K @ H) @ S
-
-    # def correct(self, measurement, landmark):
-    #     """The correction step of the Kalman filter."""
-    #     H = self.dh_dstate(self.state, landmark, self.scanner_displacement)
-    #     Sigma_r = self.measurement_distance_stddev
-    #     Sigma_a = self.measurement_angle_stddev
-    #     Q = diag([Sigma_r**2, Sigma_a**2])
-    #     S = self.covariance
-
-    #     z_pred = self.h(self.state, landmark, self.scanner_displacement)  # Predicted measurement
-    #     innovation = array(measurement) - z_pred
-    #     innovation[1] = (innovation[1] + pi) % (2*pi) - pi
-
-    #     K = S @ H.T @ linalg.inv(H @ S @ H.T + Q)
-    #     self.state = self.state + K @ innovation
-    #     self.covariance = (eye(3) - K @ H) @ S
-
-    #     return z_pred, Q  # Return predicted measurement and its covariance
 
     def correct(self, measurement, landmark):
         """

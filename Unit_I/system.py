@@ -49,12 +49,6 @@ class System:
                 self.graph_slam.add_pose(self.state)
                 self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
 
-
-            # for obs in observations:
-            #     pose_index, z_ik, landmark_index, Sigma_ik = obs
-            #     self.ekf.correct(pose_index, z_ik, landmark_index, Sigma_ik)
-            #     self.graph_slam.add_observation_constraint(pose_index, landmark_index, z_ik, Sigma_ik)
-
     def write_ekf_results(self, filename="Results_EKF.txt"):
         from math import sqrt, cos, sin
         from slam_d_library import write_cylinders
@@ -85,6 +79,7 @@ def lego_robot_test(data_dir):
     #Initialize Graph SLAM
     graph_slam = GraphSLAM()
     graph_slam.add_pose(ekf.state.copy())
+    graph_slam.scanner_displacement = ekf.scanner_displacement
     
     # Read Robot Data
     logfile = LegoLogfile()

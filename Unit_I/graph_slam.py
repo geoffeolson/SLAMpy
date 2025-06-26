@@ -5,6 +5,7 @@ This version supports adding fixed 2D poses and relative pose constraints,
 computing residuals, and preparing for Gauss-Newton optimization.
 """
 from scipy.stats import sigmaclip
+from Unit_I.extended_kalman_filter import EKF
 from lego_robot import *
 import numpy as np
 from numpy import pi, sin, cos, pi, atan2
@@ -16,9 +17,9 @@ class GraphSLAM:
         self.landmarks = []                  # List of 2D landmark positions [x, y]
         self.poses = []                      # List of 2D poses: [x, y, theta]
         self.constraints = []                # List of tuples: (i, j, z_ij, Omega_ij)
-        self.observation_constraints = []    # List of tuples: (pose_index, landmark_index, z_ik, Omega_ik)
-                                             # where z_ik is the relative observation of landmark k from pose i
-
+        self.observation_constraints = []    # List of tuples: (pose_index, landmark_index, z_ik, Omega_ik) where z_ik is the relative observation of landmark k from pose i
+        self.scanner_displacement = 30.0
+                                            # 
     def compute_relative_pose(self, x_i, x_j):
         """Compute the relative pose x_ij from x_i to x_j."""
         dx = x_j[0] - x_i[0]
@@ -45,75 +46,73 @@ class GraphSLAM:
         i = len(self.poses) - 1
         x_ij = self.compute_relative_pose(x_i, x_j)
         Omega_ij = self.compute_information_matrix(Sigma_ij)
-
         self.constraints.append((i, i+1, x_ij, Omega_ij))
 
-    @staticmethod
-    def h_observation(x_i, x_k):
-        """
-        Predicts the observation of landmark k from pose i in rectangular coordinates.
+    # @staticmethod
+    # def h_observation(x_i, x_k):
+    #     """
+    #     Predicts the observation of landmark k from pose i in rectangular coordinates.
 
-        Parameters:
-        - x_i: ndarray of shape (3,), the global robot pose [x, y, θ]
-        - x_k: ndarray of shape (2,), the global landmark point [x, y]
+    #     Parameters:
+    #     - x_i: ndarray of shape (3,), the global robot pose [x, y, θ]
+    #     - x_k: ndarray of shape (2,), the global landmark point [x, y]
 
-        Returns:
-        - z_ik_pred: ndarray of shape (2,), the predicted observation in local frame
-        """
+    #     Returns:
+    #     - z_ik_pred: ndarray of shape (2,), the predicted observation in local frame
+    #     """
 
-        dx = x_k[0] - x_i[0]
-        dy = x_k[1] - x_i[1]
-        theta = x_i[2]
+    #     dx = x_k[0] - x_i[0]
+    #     dy = x_k[1] - x_i[1]
+    #     theta = x_i[2]
 
-        # Rotation into the local frame of x_i
-        z_x = cos(theta) * dx + sin(theta) * dy
-        z_y = -sin(theta) * dx + cos(theta) * dy
+    #     # Rotation into the local frame of x_i
+    #     z_x = cos(theta) * dx + sin(theta) * dy
+    #     z_y = -sin(theta) * dx + cos(theta) * dy
 
-        return np.array([z_x, z_y])
+    #     return np.array([z_x, z_y])
 
-    @staticmethod
-    def compute_observation_error(x_i, x_k, z_ik):
-        """
-        Compute the residual error between the observed and predicted landmark measurement.
+    # def compute_observation_error(self, x_i, x_k, z_ik):
+    #     """
+    #     Compute the residual error between the observed and predicted landmark measurement.
 
-        Parameters:
-        - x_i: np.array of shape (3,), global robot pose [x_i, y_i, theta_i]
-        - x_k: np.array of shape (2,), global landmark position [x_k, y_k]
-        - z_ik: np.array of shape (2,), local observed landmark position in robot frame
+    #     Parameters:
+    #     - x_i: np.array of shape (3,), global robot pose [x_i, y_i, theta_i]
+    #     - x_k: np.array of shape (2,), global landmark position [x_k, y_k]
+    #     - z_ik: np.array of shape (2,), local observed landmark position in robot frame [range, bearing]
 
-        Returns:
-        - e_ik: np.array of shape (2,), z_ik local observation error in robot frame
-        """
-        z_ik_pred = self.h_observation(x_i, x_k) # predicted z_ik
-        e_ik = z_ik - z_ik_pred # z_ik error
-        return e_ik
+    #     Returns:
+    #     - e_ik: np.array of shape (2,), local observation error [range, bearing]
+    #     """
+    #     z_ik_pred = EKF.h(x_i, x_k, self.scanner_displacement) # predicted z_ik
+    #     e_ik = z_ik - z_ik_pred # z_ik error
+    #     return e_ik
 
-    @staticmethod
-    def dh_dpose(x_i, x_k):
-        """
-        Compute the Jacobian of the observation model h(x_i, x_k) with respect to the robot pose x_i.
+    # @staticmethod
+    # def dh_dpose(x_i, x_k):
+    #     """
+    #     Compute the Jacobian of the observation model h(x_i, x_k) with respect to the robot pose x_i.
 
-        Parameters:
-        - x_i: np.array of shape (3,), robot pose [x_i, y_i, theta_i]
-        - x_k: np.array of shape (2,), landmark position [x_k, y_k]
+    #     Parameters:
+    #     - x_i: np.array of shape (3,), robot pose [x_i, y_i, theta_i]
+    #     - x_k: np.array of shape (2,), landmark position [x_k, y_k]
 
-        Returns:
-        - J: np.array of shape (2, 3), Jacobian matrix
-        """
-        x_i, y_i, theta_i = x_i
-        x_k, y_k = x_k
+    #     Returns:
+    #     - J: np.array of shape (2, 3), Jacobian matrix
+    #     """
+    #     x_i, y_i, theta_i = x_i
+    #     x_k, y_k = x_k
 
-        dx = x_k - x_i
-        dy = y_k - y_i
-        c = np.cos(theta_i)
-        s = np.sin(theta_i)
+    #     dx = x_k - x_i
+    #     dy = y_k - y_i
+    #     c = np.cos(theta_i)
+    #     s = np.sin(theta_i)
 
-        J = np.array([
-            [-c, -s, -s * dx + c * dy],
-            [ s, -c, -c * dx - s * dy]
-        ])
+    #     J = np.array([
+    #         [-c, -s, -s * dx + c * dy],
+    #         [ s, -c, -c * dx - s * dy]
+    #     ])
 
-        return J
+    #     return J
 
 
     @staticmethod
@@ -270,15 +269,17 @@ class GraphSLAM:
             Add contributions from observation constraints to the linear system H and b.
             """
             for i, z_ik, x_k, Sigma_ik in self.observation_constraints:
+              # x_k = self.landmarks[k]  # Lookup known landmark position  Depricated
                 x_i = self.poses[i]
-                #x_k = self.landmarks[k]  # Lookup known landmark position
 
-                # Predicted observation
-                z_pred = self.h_observation(x_i, x_k)
+                # observation error
+              # z_pred = self.h_observation(x_i, x_k) Depricated
+                z_pred = EKF.h(x_i, x_k, self.scanner_displacement)
                 e_ik = z_ik - z_pred
 
                 # Jacobian w.r.t pose x_i
-                J_i = self.dh_dpose(x_i, x_k)
+              # J_i = self.dh_dpose(x_i, x_k) Depricated
+                J_i = EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
 
                 # Information matrix
                 Omega_ik = np.linalg.inv(Sigma_ik)
