@@ -276,6 +276,8 @@ class GraphSLAM:
               # z_pred = self.h_observation(x_i, x_k) Depricated
                 z_pred = EKF.h(x_i, x_k, self.scanner_displacement)
                 e_ik = z_ik - z_pred
+                e_ik[1] = (e_ik[1] + np.pi) % (2 * np.pi) - np.pi
+
 
                 # Jacobian w.r.t pose x_i
               # J_i = self.dh_dpose(x_i, x_k) Depricated
