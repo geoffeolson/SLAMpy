@@ -10,7 +10,7 @@ from lego_robot import LegoLogfile
 from slam_d_library import get_observations
 
 class System:
-    def __init__(self, ekf, graph_slam):
+    def __init__(self, ekf, graph_slam, test=False):
 
         # Dependencies
         self.ekf = ekf
@@ -21,25 +21,29 @@ class System:
         self.covariances = []
         self.matched_ref_cylinders = []
 
-    # Main System Loop
-    def run(self, logfile):
+        # Configuration Data
+        self.observations = None
+        self.controls = None
+        self.test = test
+
+    def run_ekf(self, logfile):
         reference_cylinders = [l[1:3] for l in logfile.landmarks]
         ##########################################################################
-        logfile.motor_ticks = [(500.0,500.0),(500.0,500.0),(500.0,500.0),(500.0,500.0)]
-        obs =  [[(( 1118.033989, 0.463647609 ),( 1500.0, 500.0)),
-                 (( 1118.033989,-0.463647609 ),( 1500.0,-500.0))],
-                [(( 707.1067812, 0.7853981634),( 1500.0, 500.0)),
-                 (( 707.1067812,-0.7853981634),( 1500.0,-500.0))]]
+        if self.test: logfile.motor_ticks = self.controls
         ########################################################################
         for i in range(len(logfile.motor_ticks)):
+
             # Odometry
             control = np.array(logfile.motor_ticks[i]) * self.ekf.ticks_to_mm
             prev_state = self.ekf.state
             x_i, x_j, sigma_ij = self.ekf.predict(control)
-            motion = self.ekf.state - prev_state
+            #motion = self.ekf.state - prev_state
             self.graph_slam.add_motion_constraint(i, x_i, x_j, sigma_ij)
             self.states.append(self.ekf.state)
             self.covariances.append(self.ekf.covariance)
+            s = self.ekf.state
+            a1 = self.ekf.control_motion_factor
+            print(f"step:{i}, motion stdev:{a1} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
 
             # Obervations
             observations = get_observations(
@@ -47,17 +51,29 @@ class System:
                 self.ekf.depth_jump, self.ekf.minimum_valid_distance, self.ekf.cylinder_offset,
                 self.ekf.state, self.ekf.scanner_displacement,
                 reference_cylinders, self.ekf.max_cylinder_distance)
-            ######################################################################################
-            observations = obs[i]
-            #######################################################################################
+            #################################################################
+            if self.test: observations = self.observations[i]
+            #################################################################
             self.matched_ref_cylinders.append([m[1] for m in observations])
+
 
             for j in range(len(observations)):
                 measurment, landmark = observations[j]
                 Q = self.ekf.correct(measurment, landmark)
                 self.graph_slam.add_pose(self.ekf.state)
                 self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
-                print('hey')
+                s = self.ekf.state
+                a = self.ekf.measurement_distance_stddev
+                print(f"step:{i}, obs:{j}, stdev:{a} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
+
+    def run_graph_slam(self):
+        print("run_graph_slam")
+        # Run optimization
+        self.graph_slam.solve(max_iterations=10, tol=1e-6)
+
+        # Print final optimized state
+        print("\nFinal optimized state:")
+        self.graph_slam.print_summary()
 
     def write_ekf_results(self, filename="Results_EKF.txt"):
         from math import sqrt, cos, sin
@@ -80,11 +96,29 @@ class System:
                 f.write(f"F {x} {y} {θ}\n")
         print(f"Wrote {len(self.graph_slam.poses)} poses and constraints to {filename}")
 
-def lego_robot_test(data_dir):
+    def read_json(self, json_obj):
+        self.observations = []
+        for step in json_obj["observations"]:
+            time_step = []
+            for obs in step:
+                observation = (obs["measure"], obs["landmark"])
+                time_step.append(observation)
+            self.observations.append(time_step)
+
+        self.controls = []
+        for step in json_obj["controls"]:
+            time_step = (step["left"], step["right"])
+            self.controls.append(time_step)
+
+    def load_json(self, json_filename):
+        with open(json_filename, 'r') as f:
+            self.read_json(json.load(f))
+
+def lego_robot_test(data_dir, test):
 
     #Initialize EKF
     ekf = EKF()  # dummy values
-    ekf.load_json(os.path.join(data_dir,"config.json"))
+    ekf.load_json(os.path.join(data_dir,"ekf.json"))
 
     #Initialize Graph SLAM
     graph_slam = GraphSLAM()
@@ -98,15 +132,17 @@ def lego_robot_test(data_dir):
     logfile.read(os.path.join(data_dir,"robot_arena_landmarks.txt"))
 
     # Run Main Sytyem
-    system = System(ekf, graph_slam)
-    system.run(logfile)
+    system = System(ekf, graph_slam, True)
+    system.load_json(os.path.join(data_dir,"system.json"))
+    system.run_ekf(logfile)
     system.write_ekf_results(os.path.join(data_dir,"results_ekf.txt"))
+    system.run_graph_slam()
     system.write_graph_slam_results(os.path.join(data_dir,"results_graph_slam.txt"))
 
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    lego_robot_test("Data/TestCase1")
+    lego_robot_test("Data/TestCase1", True)
 
 
 ##############################################
