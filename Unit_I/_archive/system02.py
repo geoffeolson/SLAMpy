@@ -5,7 +5,7 @@ import os
 os.chdir("Unit_I")
 from slam_d_library import get_observations, write_cylinders
 from extended_kalman_filter import EKF
-from graph_slam import GraphSLAM
+from graph_slam import Graph
 
 class System:
     def __init__(self):
@@ -30,7 +30,7 @@ class System:
         self.initial_state = np.array([1850.0, 1897.0, 213.0 / 180.0 * pi])
         self.initial_covariance = np.diag([100.0**2, 100.0**2, (10.0 / 180.0 * pi)**2])
 
-        self.graph_slam = GraphSLAM()
+        self.graph_slam = Graph()
         self.graph_slam.add_pose(self.initial_state.copy())
 
         self.ekf = EKF(self.initial_state, self.initial_covariance,

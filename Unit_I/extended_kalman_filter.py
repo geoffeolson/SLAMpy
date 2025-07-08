@@ -50,12 +50,6 @@ class EKF:
         self.control_turn_factor = json_obj["control_turn_factor"]
         self.measurement_distance_stddev = json_obj["measurement_distance_stddev"]
         self.measurement_angle_stddev = json_obj["measurement_angle_stddev"]
-        # observations = json_obj["observations"]
-        # self.observations = []
-        # for obs in observations:
-        #     a, b = obs
-        #     self.observations.append(((a[0],a[1]),(b[0],b[1])))
-
 
     def write_json(self):
         """Export EKF constants to a JSON-compatible dict."""
@@ -82,6 +76,16 @@ class EKF:
             "measurement_distance_stddev": self.measurement_distance_stddev,
             "measurement_angle_stddev": self.measurement_angle_stddev
         }
+
+    def print_motion(self, i):
+        s = self.state
+        a1 = self.control_motion_factor
+        print(f"step:{i}, motion stdev:{a1} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
+
+    def print_observation(self, i, j):
+        s = self.state
+        a = self.measurement_distance_stddev
+        print(f"step:{i}, obs:{j}, stdev:{a} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
 
     @staticmethod
     def g(state, control, w):
@@ -183,13 +187,9 @@ class EKF:
         Vt = self.dg_dcontrol(self.state, control, self.robot_width)
         Rt = np.dot(Vt, np.dot(sigma_control, Vt.T))
         Gt = self.dg_dstate(self.state, control, self.robot_width)
-        ###########################################################
-        #          NEED TO TEST THIS UPGRADE
-        self.covariance = np.dot(Gt, np.dot(self.covariance, Gt.T)) + Rt
-        #self.covariance = Gt @ self.covariance @ Gt.T + Rt
-        ##########################################################
+        self.covariance = Gt @ self.covariance @ Gt.T + Rt
         prev_state = self.state
-        self.state = self.g(self.state, control, self.robot_width)
+        self.state = self.g(self.state, control, self.robot_width)   
         return prev_state, self.state, Rt
 
     @staticmethod
@@ -258,9 +258,6 @@ class EKF:
         self.state = self.state + K @ innovation
         self.covariance = (np.eye(3) - K @ H) @ S
         return Q
-
-
-
 
 if __name__ == '__main__':
     os.chdir("Unit_I")

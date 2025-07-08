@@ -5,12 +5,12 @@ import os
 import json
 from slam_d_library import get_observations, write_cylinders
 from extended_kalman_filter import EKF
-from graph_slam import GraphSLAM
+from graph_slam import Graph
 from lego_robot import LegoLogfile
 from slam_d_library import get_observations
 
 class System:
-    def __init__(self, ekf, graph_slam, test=False):
+    def __init__(self, ekf, graph_slam, debug=False, test_data=False):
 
         # Dependencies
         self.ekf = ekf
@@ -24,56 +24,107 @@ class System:
         # Configuration Data
         self.observations = None
         self.controls = None
-        self.test = test
+        self.controls2 = None
+        self.debug = debug
+        self.test_data = test_data
 
-    def run_ekf(self, logfile):
+    def run(self, logfile):
+
+        #Run EKF
+        if self.debug: print("******* EKF ********")
         reference_cylinders = [l[1:3] for l in logfile.landmarks]
-        ##########################################################################
-        if self.test: logfile.motor_ticks = self.controls
-        ########################################################################
+        if self.test_data: logfile.motor_ticks = self.controls
+        self.controls2 = []
         for i in range(len(logfile.motor_ticks)):
-
             # Odometry
             control = np.array(logfile.motor_ticks[i]) * self.ekf.ticks_to_mm
+            self.controls2.append(control)
             prev_state = self.ekf.state
             x_i, x_j, sigma_ij = self.ekf.predict(control)
             #motion = self.ekf.state - prev_state
+            #################################################
+            #if i==35:breakpoint()
+            #################################################
             self.graph_slam.add_motion_constraint(i, x_i, x_j, sigma_ij)
-            self.states.append(self.ekf.state)
+            #self.states.append(self.ekf.state)
             self.covariances.append(self.ekf.covariance)
-            s = self.ekf.state
-            a1 = self.ekf.control_motion_factor
-            print(f"step:{i}, motion stdev:{a1} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
+            if self.debug: self.ekf.print_motion(i)
 
             # Obervations
-            observations = get_observations(
-                logfile.scan_data[i],
-                self.ekf.depth_jump, self.ekf.minimum_valid_distance, self.ekf.cylinder_offset,
+            observations = get_observations( logfile.scan_data[i], self.ekf.depth_jump, 
+                self.ekf.minimum_valid_distance, self.ekf.cylinder_offset,
                 self.ekf.state, self.ekf.scanner_displacement,
                 reference_cylinders, self.ekf.max_cylinder_distance)
-            #################################################################
-            if self.test: observations = self.observations[i]
-            #################################################################
-            self.matched_ref_cylinders.append([m[1] for m in observations])
-
-
+            if self.test_data: observations = self.observations[i]
             for j in range(len(observations)):
                 measurment, landmark = observations[j]
                 Q = self.ekf.correct(measurment, landmark)
-                self.graph_slam.add_pose(self.ekf.state)
                 self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
-                s = self.ekf.state
-                a = self.ekf.measurement_distance_stddev
-                print(f"step:{i}, obs:{j}, stdev:{a} state: {s[0]:.3f}, {s[1]:.3f}, {s[2]:.3f}")
+                if self.debug: self.ekf.print_observation(i,j)
+            self.graph_slam.add_pose(self.ekf.state)
 
-    def run_graph_slam(self):
-        print("run_graph_slam")
-        # Run optimization
-        self.graph_slam.solve(max_iterations=10, tol=1e-6)
+            # Log state, covariance, and matched cylinders for later output.
+            self.states.append(self.ekf.state)
+            self.covariances.append(self.ekf.covariance)
+            self.matched_ref_cylinders.append([m[1] for m in observations])
 
-        # Print final optimized state
-        print("\nFinal optimized state:")
+        #Run Graph SLAM Solver
+        ##################################
+        #self.test_print()
+        ########################
+
+        if self.debug: print("\n****** GRAPH SLAM ********")
+        self.plot_motion_control()
+        self.graph_slam.ekf_states = self.states.copy()
+        self.graph_slam.solve(self.debug, max_iterations=50, tol=0.001)
         self.graph_slam.print_summary()
+        #self.graph_slam.plot()
+        #self.plot()
+
+    def read_logfiles(self, filename):
+        logfile = LegoLogfile()
+        logfile.read(os.path.join("robot4_motors.txt"))
+        logfile.read(os.path.join("robot4_scan.txt"))
+        logfile.read(os.path.join("robot_arena_landmarks.txt"))
+
+        self.control = [np.array(ctrl) * self.ekf.ticks_to_mm for ctrl in logfile.motor_ticks]
+
+        self.ekf.scanner_displacement = logfile.scanner_displacement
+        self.ekf.robot_width = logfile.robot_width
+
+        for i in range(len(logfile.motor_ticks)):
+            # Odometry
+            control = np.array(logfile.motor_ticks[i]) * self.ekf.ticks_to_mm
+            self.controls2.append(control)
+            prev_state = self.ekf.state
+            x_i, x_j, sigma_ij = self.ekf.predict(control)
+            #motion = self.ekf.state - prev_state
+            #################################################
+            #if i==35:breakpoint()
+            #################################################
+            self.graph_slam.add_motion_constraint(i, x_i, x_j, sigma_ij)
+            #self.states.append(self.ekf.state)
+            self.covariances.append(self.ekf.covariance)
+            if self.debug: self.ekf.print_motion(i)
+
+            # Obervations
+            observations = get_observations( logfile.scan_data[i], self.ekf.depth_jump, 
+                self.ekf.minimum_valid_distance, self.ekf.cylinder_offset,
+                self.ekf.state, self.ekf.scanner_displacement,
+                reference_cylinders, self.ekf.max_cylinder_distance)
+            if self.test_data: observations = self.observations[i]
+            for j in range(len(observations)):
+                measurment, landmark = observations[j]
+                Q = self.ekf.correct(measurment, landmark)
+                self.graph_slam.add_observation_constraint(i+1, measurment, landmark, Q)
+                if self.debug: self.ekf.print_observation(i,j)
+            self.graph_slam.add_pose(self.ekf.state)
+
+            # Log state, covariance, and matched cylinders for later output.
+            self.states.append(self.ekf.state)
+            self.covariances.append(self.ekf.covariance)
+            self.matched_ref_cylinders.append([m[1] for m in observations])
+
 
     def write_ekf_results(self, filename="Results_EKF.txt"):
         from math import sqrt, cos, sin
@@ -94,7 +145,6 @@ class System:
         with open(filename, "w") as f:
             for x, y, θ in self.graph_slam.poses:
                 f.write(f"F {x} {y} {θ}\n")
-        print(f"Wrote {len(self.graph_slam.poses)} poses and constraints to {filename}")
 
     def read_json(self, json_obj):
         self.observations = []
@@ -110,18 +160,72 @@ class System:
             time_step = (step["left"], step["right"])
             self.controls.append(time_step)
 
-    def load_json(self, json_filename):
-        with open(json_filename, 'r') as f:
+    def load_json(self, filename):
+        with open(filename, 'r') as f:
             self.read_json(json.load(f))
 
-def lego_robot_test(data_dir, test):
+    def plot(self):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Create a Figure and a single Axes object
+        # plt.subplots() returns a tuple: (Figure object, Axes object or array of Axes objects)
+        fig, ax = plt.subplots() 
+
+        p = np.array(self.graph_slam.poses)
+        ax.plot(p[:,0], p[:,1], label='GraphSLAM')
+
+        p = np.array(self.states)
+        ax.plot(p[:,0], p[:,1], label='EKF')
+
+        # Set properties of the Axes
+        ax.set_title('Simple Sine Wave Plot')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        ax.legend() # Display the legend based on the 'label' in ax.plot()
+        ax.grid(True) # Add a grid to the plot
+
+        # Display the plot
+        plt.show()
+
+    def plot_motion_control(self):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Setup data
+        c = np.array([np.array(control) for control in self.controls2])
+        t = np.arange(c.shape[0])
+
+        # Plot data
+        fig, ax = plt.subplots() 
+        ax.plot(t, c[:,0], label='right')
+        ax.plot(t, c[:,1], label='left')
+        ax.set_title('Motion Controls')
+        ax.set_xlabel('Time Step')
+        ax.set_ylabel('Control Ticks')
+        ax.legend() # Display the legend based on the 'label' in ax.plot()
+        ax.grid(True) # Add a grid to the plot
+
+#######################################################################
+    def test_print(self):
+        print("***** EKF States ******")
+        for idx, s in enumerate(self.states):
+            print(f"  x{idx} = {s[0]:.6f} {s[1]:.6f} {s[2]:.6f}")
+        print("***** GraphSLAM States ******")
+        for idx, s in enumerate(self.graph_slam.poses):
+            print(f"  x{idx} = {s[0]:.6f} {s[1]:.6f} {s[2]:.6f}")
+##########################################################################
+
+
+
+def lego_robot_test(data_dir, debug=False, test_data=False):
 
     #Initialize EKF
     ekf = EKF()  # dummy values
     ekf.load_json(os.path.join(data_dir,"ekf.json"))
 
     #Initialize Graph SLAM
-    graph_slam = GraphSLAM()
+    graph_slam = Graph()
     graph_slam.add_pose(ekf.state.copy())
     graph_slam.scanner_displacement = ekf.scanner_displacement
     
@@ -132,17 +236,46 @@ def lego_robot_test(data_dir, test):
     logfile.read(os.path.join(data_dir,"robot_arena_landmarks.txt"))
 
     # Run Main Sytyem
-    system = System(ekf, graph_slam, True)
+    system = System(ekf, graph_slam, debug, test_data)
     system.load_json(os.path.join(data_dir,"system.json"))
-    system.run_ekf(logfile)
+    system.run(logfile)
     system.write_ekf_results(os.path.join(data_dir,"results_ekf.txt"))
-    system.run_graph_slam()
     system.write_graph_slam_results(os.path.join(data_dir,"results_graph_slam.txt"))
+
 
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    lego_robot_test("Data/TestCase1", True)
+    lego_robot_test("Data/LegoRobot", debug=True, test_data=False)
+    ##########################################################################
+
+    # import matplotlib.pyplot as plt
+    # import numpy as np
+
+    # # Create a Figure and a single Axes object
+    # # plt.subplots() returns a tuple: (Figure object, Axes object or array of Axes objects)
+    # fig, ax = plt.subplots() 
+
+    # # Generate some sample data
+    # x = np.linspace(0, 10, 100)
+    # y = np.sin(x)
+
+    # # Plot data on the Axes
+    # ax.plot(x, y, label='Sine Wave')
+
+    # # Set properties of the Axes
+    # ax.set_title('Simple Sine Wave Plot')
+    # ax.set_xlabel('X-axis')
+    # ax.set_ylabel('Y-axis')
+    # ax.legend() # Display the legend based on the 'label' in ax.plot()
+    # ax.grid(True) # Add a grid to the plot
+
+    # # Display the plot
+    # plt.show()
+
+    ################################################################################
+
+
 
 
 ##############################################

@@ -6,7 +6,7 @@ import os
 os.chdir("Unit_I")
 from slam_d_library import get_observations, write_cylinders
 from extended_kalman_filter import EKF
-from graph_slam import GraphSLAM
+from graph_slam import Graph
 
 
 def compute_relative_pose(x_i, x_j):
@@ -63,7 +63,7 @@ def test():
     ###########################
     #      GRAPH SLAM
     ###########################
-    graph_slam = GraphSLAM()
+    graph_slam = Graph()
     graph_slam.add_pose(initial_state.copy())  # Pose x0
 
     ######################
