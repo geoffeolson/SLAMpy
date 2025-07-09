@@ -23,58 +23,41 @@ class Graph:
         self.scanner_displacement = 30.0     # Offset of observation scanner from robot center
         self.H = None                        # Matrix for system of equations used for solver
         self.b = None                        # Matrix for system of equations used for solver
+        self.motion_noise = np.diag([5**2, 10**2, (1.0*pi/180)**2])
    
     def compute_relative_pose(self, x_i, x_j):
-        """Compute the relative pose x_ij from x_i to x_j."""
+        """
+        Compute x_ij the pose of x_j relative to x_i. This is the 2D pose [x, y, theta]
+        """
+        # Deltas x_j - x_i and angle theta_i
         dx = x_j[0] - x_i[0]
         dy = x_j[1] - x_i[1]
         dtheta = x_j[2] - x_i[2]
         θ = x_i[2]
         
+        # Rotate the deltas by -θ to get relative pose in x_i's frame
         rot_dx = cos(-θ) * dx - sin(-θ) * dy
         rot_dy = sin(-θ) * dx + cos(-θ) * dy
         rot_dtheta = (dtheta + pi) % (2 * pi) - pi
+        
         return np.array([rot_dx, rot_dy, rot_dtheta])
 
-    @staticmethod
-    def compute_information_matrix( Sigma):
+    def add_motion_constraint(self, i, j, x_i, x_j, Sigma_ij):
         """
+        Add a motion constraint between the last pose and the new pose x_j.
+        
         The robot motion model results in a covariance matrix with perfect correlation, 
         because robot rotation only results from unequal rotation between right and left tracks. 
         This correlation in the covariance matrix results in a singular matrix that cannot be inverted. 
-        The following code increases all the variances of the covariance matrix by 20% providing 
+        The following code adds a small motion_noise to the covariance matrix, providing 
         imperfect correlation resulting in a more realistic robot motion model and an invertable matrix.
         """
-        # rng = np.arange(Sigma.shape[0])
-        # Sigma[rng,rng] *= 1.2
-        Lambda =  1.0e-3
-        Sigma = (Sigma + Lambda * np.eye(Sigma.shape[0]))/(1 + Lambda)
-        #Sigma = Sigma + Lambda * np.eye(Sigma.shape[0])
-
-        Omega = np.linalg.inv(Sigma) # now the matrix can be safely inverted
-        return Omega
-
-    def compute_information_matrix_old(self, Sigma_ij):
-        """Compute the information matrix Ω_ij from covariance Σ_ij."""
-        try:
-            return np.linalg.inv(Sigma_ij)
-        except np.linalg.LinAlgError:
-            return np.zeros_like(Sigma_ij)
-
-    def add_motion_constraint(self, i, x_i, x_j, Sigma_ij):
-        """
-        Add a motion constraint between the last pose and the new pose x_j.
-        Automatically computes x_ij and Ω_ij internally.
-        """
-        # correlation = self.covariance_to_correlation(Sigma_ij)
         x_ij = self.compute_relative_pose( x_i, x_j)
-        # if norm(x_ij) < 1.0e-5 or norm(Sigma_ij) < 1.0e-5:
-        #     return
-        Omega_ij = self.compute_information_matrix(Sigma_ij)
-        #################################################################
-        #Omega_ij *= 0.02
-        ##################################################################
-        self.constraints.append((i, i+1, x_ij, Omega_ij))
+        
+        #Compute the information matrix from the covariance matrix
+        Omega_ij = np.linalg.inv(Sigma_ij + self.motion_noise)
+
+        self.constraints.append((i, j, x_ij, Omega_ij))
 
     @staticmethod
     def v2t(pose_vec):
@@ -101,26 +84,17 @@ class Graph:
         """Add a new pose to the graph."""
         self.poses.append(np.array(pose))
 
-    def add_constraint(self, i, j, z_ij, Omega_ij):
-        """
-        Add a relative pose constraint between pose i and pose j.
-        z_ij: expected relative motion from i to j
-        Omega_ij: 3x3 information matrix
-        """
-        self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
-
-    def add_observation_constraint(self, pose_index, measurment, landmark, Omega_ij):
+    def add_observation_constraint(self, pose_index, measurment, landmark, Sigma_ij):
         """
         Add an observation constraint between a pose and a landmark.
-    
         pose_index: Index of the robot pose at the time of observation.
-        landmark_index: Unique ID or index of the observed landmark.
-        z_ij: Measured observation from the pose to the landmark (in the robot's local frame).
-        Omega_ij: 2x2 or 3x3 information matrix of the observation (inverse of covariance).
+        z_ij: measured observation from the pose to the landmark [range, bearing]
+        x_k: landmark in the global frame [x, y].
+        Sigma_ij: 2x2 covariance matrix of the observation [range, bearing].
         """
-        #################################################################
-        #Omega_ij *= 0.02
-        ##################################################################
+        #Compute the information matrix from the covariance matrix
+        Omega_ij = np.linalg.inv(Sigma_ij)
+
         self.observation_constraints.append((pose_index, np.array(measurment), np.array(landmark), np.array(Omega_ij)))
 
     def compute_error(self, constraint):
@@ -140,27 +114,26 @@ class Graph:
         Zij_hat = Graph.t2v(Tij_pred)
 
         error = Zij - Zij_hat
-        error[2] = (error[2] + np.pi) % (2 * np.pi) - np.pi
+        error[2] = (error[2] + pi) % (2 * pi) - pi
         return error
 
     @staticmethod
     def compute_jacobians(xi, xj):
         """
-        Compute Jacobians A_ij and B_ij for the relative pose constraint between xi and xj.
-
-        Parameters:
-        xi : ndarray (3,) - pose i [x_i, y_i, theta_i]
-        xj : ndarray (3,) - pose j [x_j, y_j, theta_j]
-
+        Compute 3x3 Jacobians matricies A_ij and B_ij. 
+        Thess are the derivatives of the pose error vector e_ij with respect to the corresponding poses xi and xj.
+        Given: 
+            xi: the pose i [x_i, y_i, theta_i] 
+            xj: the pose j [x_j, y_j, theta_j]
         Returns:
-        A_ij : ndarray (3, 3)
-        B_ij : ndarray (3, 3)
+            A_ij: 3x3 matrix derivative of the error e_ij with respect to xi
+            B_ij: 3x3 matrix derivative of the error e_ij with respect to xj
         """
         # Extract values
         xi_x, xi_y, xi_theta = xi
         xj_x, xj_y, xj_theta = xj
 
-        # Compute delta t
+        # 2D translation delta t
         delta_t = np.array([xj_x - xi_x, xj_y - xi_y])
 
         # Rotation matrix Ri and its transpose
@@ -201,10 +174,6 @@ class Graph:
         for constraint in self.constraints:
             i, j, z_ij, Omega_ij = constraint
 
-            ################################################################
-            #if i==34:breakpoint()
-            ################################################################
-
             # Get current poses
             xi = self.poses[i]
             xj = self.poses[j]
@@ -239,27 +208,23 @@ class Graph:
         """
         Add contributions from observation constraints to the linear system H and b.
         """
-        for i, z_ik, x_k, Sigma_ik in self.observation_constraints:
+        for i, z_ik, x_k, Omega_ik in self.observation_constraints:
             x_i = self.poses[i]
-
-            ################################################################
-            #if i==35: breakpoint()
-            ################################################################
 
             # observation error
             z_pred = EKF.h(x_i, x_k, self.scanner_displacement)
             e_ik = z_ik - z_pred
-            e_ik[1] = (e_ik[1] + np.pi) % (2 * np.pi) - np.pi
+            e_ik[1] = (e_ik[1] + pi) % (2 * pi) - pi
 
             # Jacobian w.r.t pose x_i
-            J_i = EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
+            J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
 
             # Information matrix
-            Omega_ik = inv(Sigma_ik)
+            #Omega_ik = inv(Sigma_ik)
 
             # Compute contribution to H and b
             H_ii = J_i.T @ Omega_ik @ J_i
-            b_i = - J_i.T @ Omega_ik @ e_ik
+            b_i  = J_i.T @ Omega_ik @ e_ik
 
             i_idx = slice(3 * i, 3 * i + 3)
             self.H[i_idx, i_idx] += H_ii
@@ -270,10 +235,7 @@ class Graph:
         Gauss-Newton optimizer for Graph-Based SLAM.
         Follows the full system described in README.md.
         """
-        N = len(self.poses)
-        
-        if debug: self.print_Iteration(-1, 0)
-
+        if debug: self.print_Iteration(-1, 0, 0)
         N = len(self.poses)
         self.H = np.zeros((3 * N, 3 * N))
         self.b = np.zeros((3 * N, ))
@@ -289,15 +251,9 @@ class Graph:
             self.H[:, 0:3] = 0
             self.H[0:3, 0:3] = np.eye(3)
             self.b[0:3] = 0
-            ###########################################################################
-            # svd = np.linalg.svd(self.H)
-            # for i,x in enumerate(svd.S):
-            #     print(x)
-            #condition = np.linalg.cond(self.H)
-            #print(f"matrix condition: {condition}")
-            #self.H += 1.0e-9 * np.eye(self.H.shape[0])
-            ##########################################################################@
+
             # Solve the system: H Δx = -b
+            condition = np.linalg.cond(self.H)
             delta_x = np.linalg.solve(self.H, -self.b)
             neg_b = self.H @ delta_x
 
@@ -309,36 +265,35 @@ class Graph:
 
             # Check for convergence
             norm_dx = np.linalg.norm(delta_x)
-            #print(f"\nIteration {iteration+1}")
             if debug: 
-                self.print_Iteration(iteration, norm_dx)
-                self.plot_x_y_theta(delta_x,"Delta X")
-                self.plot_x_y_theta(neg_b,"Negative b")
-                self.plot_compare()
+                self.print_Iteration(iteration, norm_dx, condition)
+                # self.plot_x_y_theta(delta_x,"Delta X")
+                # self.plot_x_y_theta(neg_b,"Negative b")
+                self.plot_comparison()
             if norm_dx < tol:
                 print(f"Converged in {iteration+1} iterations.")
                 break
+        
 
-    def print_Iteration(self, i, norm_dx):
+    def print_Iteration(self, i, norm_dx, condition):
         x = self.poses
-        print(f"{i+1}. dx_norm: {norm_dx:.6f}, Pose_1:[{x[1][0]:.6f}, {x[1][1]:.6f}, {x[1][2]:.6f}], Pose_2:[{x[2][0]:.6f}, {x[2][1]:.6f}, {x[2][2]:.6f}]")
+        print(f"{i+1}. dx_norm: {norm_dx:.6f}, condition: {condition:.1e} Pose_1:[{x[1][0]:.6f}, {x[1][1]:.6f}, {x[1][2]:.6f}], Pose_2:[{x[2][0]:.6f}, {x[2][1]:.6f}, {x[2][2]:.6f}]")
 
-    def plot_compare(self):
+    def plot_comparison(self):
         import matplotlib.pyplot as plt
         import numpy as np
-
-        # Create a Figure and a single Axes object
-        # plt.subplots() returns a tuple: (Figure object, Axes object or array of Axes objects)
         fig, ax = plt.subplots() 
 
+        # plot the poses from Graph SLAM
         p = np.array(self.poses.copy())
-        ax.plot(p[:,0], p[:,1], label='GraphSLAM')
+        ax.plot(p[:,0], p[:,1], 'y-', label='GraphSLAM', linewidth=4)
 
+        # plot the EKF states
         p = np.array(self.ekf_states.copy())
-        ax.plot(p[:,0], p[:,1], label='EKF')
+        ax.plot(p[:,0], p[:,1], 'g--', label='EKF', linewidth=2)
 
         # Set properties of the Axes
-        ax.set_title('Simple Sine Wave Plot')
+        ax.set_title('EKF vs Graph SLAM')
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         ax.legend() # Display the legend based on the 'label' in ax.plot()
@@ -347,6 +302,7 @@ class Graph:
         # Display the plot
         plt.show()
 
+    @staticmethod
     def plot_x_y_theta(self, data, title="Title"):
         import matplotlib.pyplot as plt
         import numpy as np
@@ -613,6 +569,33 @@ if __name__ == '__main__':
 ##################################################################
 #     DEPRICATED CODE
 ##################################################################
+
+    # def add_constraint(self, i, j, z_ij, Omega_ij):
+    #     """
+    #     Add a relative pose constraint between pose i and pose j.
+    #     z_ij: expected relative motion from i to j
+    #     Omega_ij: 3x3 information matrix
+    #     """
+    #     self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
+
+
+    # def compute_information_matrix(self, Sigma):
+    #     """
+    #     The robot motion model results in a covariance matrix with perfect correlation, 
+    #     because robot rotation only results from unequal rotation between right and left tracks. 
+    #     This correlation in the covariance matrix results in a singular matrix that cannot be inverted. 
+    #     The following code increases all the variances of the covariance matrix by 20% providing 
+    #     imperfect correlation resulting in a more realistic robot motion model and an invertable matrix.
+    #     """
+    #     # rng = np.arange(Sigma.shape[0])
+    #     # Sigma[rng,rng] *= 1.2
+    #     #Lambda =  1.0e-3
+    #     #Sigma = (Sigma + Lambda * np.eye(Sigma.shape[0]))/(1 + Lambda)
+    #     #Sigma = Sigma + Lambda * np.eye(Sigma.shape[0])
+    #     #Sigma += self.motion_noise
+
+    #     Omega = np.linalg.inv(Sigma + self.motion_noise)
+    #     return Omega
 
 
 # def test_prediction_old():
