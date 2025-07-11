@@ -23,7 +23,12 @@ class Graph:
         self.scanner_displacement = 30.0     # Offset of observation scanner from robot center
         self.H = None                        # Matrix for system of equations used for solver
         self.b = None                        # Matrix for system of equations used for solver
-        self.motion_noise = np.diag([5**2, 10**2, (1.0*pi/180)**2])
+
+        ############################################################################
+        #TESTING CODE REMOVE
+        #self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
+        self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
+        ############################################################################
    
     def compute_relative_pose(self, x_i, x_j):
         """
@@ -92,6 +97,10 @@ class Graph:
         x_k: landmark in the global frame [x, y].
         Sigma_ij: 2x2 covariance matrix of the observation [range, bearing].
         """
+        ##################################################################
+        #   TESTING CODE REMOVE
+        #Sigma_ij *= 0.1
+        ####################################################################
         #Compute the information matrix from the covariance matrix
         Omega_ij = np.linalg.inv(Sigma_ij)
 
@@ -162,14 +171,14 @@ class Graph:
 
         return A_ij, B_ij
 
-    def build_linear_system(self):
+    def controls_linear_system(self):
         """
         Build the linear system H and b for Graph-Based SLAM.
         Follows directly from the derivation in the README.md
         """
-        N = 3 * len(self.poses)
-        self.H = np.zeros((N, N))
-        self.b = np.zeros((N, ))
+        # N = 3 * len(self.poses)
+        # self.H = np.zeros((N, N))
+        # self.b = np.zeros((N, ))
 
         for constraint in self.constraints:
             i, j, z_ij, Omega_ij = constraint
@@ -181,6 +190,14 @@ class Graph:
             # Compute error and Jacobians
             e_ij = self.compute_error(constraint)
             A_ij, B_ij = Graph.compute_jacobians(xi, xj)
+
+            ############################################################################
+            # x,y,theta = e_ij
+            # x = x.item()
+            # y = y.item()
+            # theta = (theta * 180 / pi).item()
+            # if i == 1: breakpoint()
+            #########################################################################
 
             # Compute blocks for H
             H_ii = A_ij.T @ Omega_ij @ A_ij
@@ -204,7 +221,7 @@ class Graph:
             self.b[i_idx] += b_i
             self.b[j_idx] += b_j
 
-    def linear_system_observations(self):
+    def observations_linear_system(self):
         """
         Add contributions from observation constraints to the linear system H and b.
         """
@@ -216,11 +233,16 @@ class Graph:
             e_ik = z_ik - z_pred
             e_ik[1] = (e_ik[1] + pi) % (2 * pi) - pi
 
-            # Jacobian w.r.t pose x_i
-            J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
+            #####################################################################
+            # rng, bear = e_ik
+            # rng = rng.item()
+            # bear = (bear * 180 / pi).item()
+            # x = (x_k[0]).item()
+            # y = (x_k[1]).item()
+            #####################################################################
 
-            # Information matrix
-            #Omega_ik = inv(Sigma_ik)
+            # Jacobian: the derivative of observation error with respect to pose x_i
+            J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
 
             # Compute contribution to H and b
             H_ii = J_i.T @ Omega_ik @ J_i
@@ -230,32 +252,41 @@ class Graph:
             self.H[i_idx, i_idx] += H_ii
             self.b[i_idx] += b_i
 
+    def anchor_pose(self, time_step):
+        # Anchor pose at time_step
+        s = slice(time_step, time_step + 3)
+        self.H[s,:] = 0
+        self.H[:,s] = 0
+        self.H[s,s] = np.eye(3)
+        self.b[s]   = 0
+
     def solve(self, debug = False, max_iterations=10, tol=1e-4):
         """
         Gauss-Newton optimizer for Graph-Based SLAM.
         Follows the full system described in README.md.
         """
-        if debug: self.print_Iteration(-1, 0, 0)
+        if debug: self.print_iteration(-1, 0)
         N = len(self.poses)
-        self.H = np.zeros((3 * N, 3 * N))
-        self.b = np.zeros((3 * N, ))
-
+        self.H = np.zeros((3*N, 3*N))
+        self.b = np.zeros((3*N, ))
+        if debug: self.plot_comparison() #show plot of initial data before optimization 
         for iteration in range(max_iterations):
 
-            # Build linear system
-            self.build_linear_system()
-            self.linear_system_observations()
+            # Build linear system: H Δx = -b
+            self.controls_linear_system()
+            self.observations_linear_system()
+            self.anchor_pose(0) # anchor the first pose
 
-            # Apply gauge fixing (anchor first pose)
-            self.H[0:3, :] = 0
-            self.H[:, 0:3] = 0
-            self.H[0:3, 0:3] = np.eye(3)
-            self.b[0:3] = 0
-
-            # Solve the system: H Δx = -b
-            condition = np.linalg.cond(self.H)
+            # Solve Linear System: H Δx = -b
             delta_x = np.linalg.solve(self.H, -self.b)
             neg_b = self.H @ delta_x
+
+
+            #####################################################################
+            #TESTING CODE REMOVE
+            delta_x *= 0.5
+            #######################################################################
+
 
             # Apply updates to poses
             for i in range(N):
@@ -266,17 +297,21 @@ class Graph:
             # Check for convergence
             norm_dx = np.linalg.norm(delta_x)
             if debug: 
-                self.print_Iteration(iteration, norm_dx, condition)
-                # self.plot_x_y_theta(delta_x,"Delta X")
-                # self.plot_x_y_theta(neg_b,"Negative b")
-                self.plot_comparison()
+                self.print_iteration(iteration, norm_dx)
+                if iteration >= 0:
+                    self.plot_x_y_theta(delta_x,"Delta X")
+                    #self.plot_x_y_theta(neg_b,"Estimated -b")
+                    #self.plot_x_y_theta(-self.b,"Actual -b ")
+                    self.plot_comparison()
             if norm_dx < tol:
                 print(f"Converged in {iteration+1} iterations.")
                 break
         
 
-    def print_Iteration(self, i, norm_dx, condition):
+    def print_iteration(self, i, norm_dx):
         x = self.poses
+        if self.H is not None: condition = np.linalg.cond(self.H)
+        else: condition = 0
         print(f"{i+1}. dx_norm: {norm_dx:.6f}, condition: {condition:.1e} Pose_1:[{x[1][0]:.6f}, {x[1][1]:.6f}, {x[1][2]:.6f}], Pose_2:[{x[2][0]:.6f}, {x[2][1]:.6f}, {x[2][2]:.6f}]")
 
     def plot_comparison(self):
@@ -300,10 +335,10 @@ class Graph:
         ax.grid(True) # Add a grid to the plot
 
         # Display the plot
-        plt.show()
+        plt.show(block=True)
 
     @staticmethod
-    def plot_x_y_theta(self, data, title="Title"):
+    def plot_x_y_theta( data, title="Title"):
         import matplotlib.pyplot as plt
         import numpy as np
 
@@ -321,14 +356,14 @@ class Graph:
         ax1.set_xlabel('Time Step')
         ax1.set_ylabel('XY (mm)', color='g')
         ax1.tick_params(axis='y', labelcolor='g')
-        ax1.legend()
+        ax1.legend(loc='upper left')
 
         #  Plot on the right y axis
         ax2 = ax1.twinx() 
-        ax2.plot(time_step, theta, 'r--', label='Theta')
-        ax2.set_ylabel('Theta (rad)', color='b')
+        ax2.plot(time_step, theta*180/pi, 'r--', label='Theta')
+        ax2.set_ylabel('Theta (deg)', color='b')
         ax2.tick_params(axis='y', labelcolor='b')
-        ax2.legend()
+        ax2.legend(loc='upper right')
 
         plt.title(title)
         fig.tight_layout() # Adjust layout to prevent labels from overlapping
@@ -478,7 +513,7 @@ def test_linear_system():
     gs = test_object_creation()
 
     # Build system
-    H, b = gs.build_linear_system()
+    H, b = gs.controls_linear_system()
 
     # Print system matrices for inspection
     print("\n\n*********** LINEAR SYSTEM TEST ***********")

@@ -16,6 +16,8 @@ class EKF:
     def __init__(self):
 
         # Some constants.
+        self.initial_state = np.zeros((3,))
+        self.initial_covariance = np.diag([100**2, 100**2, (10 * pi / 180)**2])
         self.ticks_to_mm = 0.349
         self.cylinder_offset = 90.0
         self.depth_jump = 100.0
@@ -35,10 +37,10 @@ class EKF:
 
     def read_json(self, json_obj):
         """Initialize EKF constants from a JSON object (dict)."""
-        self.state = np.array(json_obj["initial_state"])
-        self.state[2] *= pi/180
-        S = np.array(json_obj["covariance"])
-        self.covariance = np.diag([S[0]**2, S[1]**2, (S[2] * pi / 180)**2])
+        self.initial_state = np.array(json_obj["initial_state"])
+        self.initial_state[2] *= pi/180
+        S = np.array(json_obj["initial_covariance"])
+        self.initial_covariance = np.diag([S[0]**2, S[1]**2, (S[2] * pi / 180)**2])
         self.ticks_to_mm = json_obj["ticks_to_mm"]
         self.cylinder_offset = json_obj["cylinder_offset"]
         self.depth_jump = json_obj["depth_jump"]

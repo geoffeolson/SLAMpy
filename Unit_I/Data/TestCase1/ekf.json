@@ -1,6 +1,6 @@
 {
   "initial_state": [ 0.0, 0.0, 0.0 ],
-  "covariance": [ 100.0, 100.0, 10.0 ],
+  "initial_covariance": [ 100.0, 100.0, 10.0 ],
   "ticks_to_mm": 1.0,
   "cylinder_offset": 90.0,
   "depth_jump": 100.0,

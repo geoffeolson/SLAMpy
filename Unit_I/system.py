@@ -35,28 +35,33 @@ class System:
         """
         Run the main system.  This includes performing Extended Kalman Filter (EKF).  
         EKF is used as the front end to build a factor graph for the Graph SLAM backend. 
-        Graph SLAM solves the graph to provide optimized poses positions of the robot.
+        Graph SLAM solves the graph to provide optimized poses of the robot.
         """
-        # Logging containers
+        # Initialize Logging Containers
         self.states = []
         self.covariances = []
         self.matched_ref_cylinders = []
         self.observations_log = []
         self.controls_log = []
 
-        #Run EKF
+        # Initialize EKF and GraphSLAM
+        self.ekf.state = self.ekf.initial_state
+        self.ekf.covariance = self.ekf.initial_covariance
+        self.graph_slam.add_pose(self.ekf.initial_state)
+        self.graph_slam.scanner_displacement = self.ekf.scanner_displacement
+
+        # Run Kalman Filter
         if self.debug: print("******* EKF ********")
         for i in range(self.get_count()):
 
-            # Odometry
-            prev_state = self.ekf.state
+            # Motion Control (EKF Predict)
             control = self.get_control(i)
             x_i, x_j, sigma_ij = self.ekf.predict(control)
+            if i ==0: sigma_ij = self.ekf.initial_covariance
             self.graph_slam.add_motion_constraint(i, i+1, x_i, x_j, sigma_ij)
-            self.covariances.append(self.ekf.covariance)
             if self.debug: self.ekf.print_motion(i)
 
-            # Observations
+            # Landmark Observations (EKF Correct)
             observations = self.get_observations(i)
             for j in range(len(observations)):
                 measurment, landmark = observations[j]
@@ -65,18 +70,18 @@ class System:
                 if self.debug: self.ekf.print_observation(i,j)
             self.graph_slam.add_pose(self.ekf.state)
 
-            # Logging
+            # Data Logging
             self.states.append(self.ekf.state)
             self.covariances.append(self.ekf.covariance)
             self.matched_ref_cylinders.append([m[1] for m in observations])
 
+        # Run GRAPH SLAM Solver
         if self.debug: print("\n****** GRAPH SLAM ********")
         self.plot_motion_control()
         self.graph_slam.ekf_states = self.states.copy()
+        self.graph_slam.ekf_states.insert(0,self.ekf.initial_state)
         self.graph_slam.solve(self.debug, max_iterations=50, tol=0.001)
-        self.graph_slam.print_summary()
-        #self.graph_slam.plot_compare()
-        #self.plot()
+        if self.debug: self.graph_slam.print_summary()
 
     def get_count(self):
         if self.sim:
@@ -193,14 +198,10 @@ class System:
         ax.grid(True) # Add a grid to the plot
 
 def system_test(debug=False, test_data=False):
-    #Initialize EKF
-    ekf = EKF()  # dummy values
+    #Build EKF and GraphSLAM Objects
+    ekf = EKF()
     ekf.load_json("ekf.json")
-
-    #Initialize Graph SLAM
     graph_slam = Graph()
-    graph_slam.add_pose(ekf.state.copy())
-    graph_slam.scanner_displacement = ekf.scanner_displacement
 
     # Run Main Sytyem
     system = System(ekf, graph_slam, debug, test_data)
