@@ -1,21 +1,29 @@
-import numpy as np
+﻿import numpy as np
 
 class AngleScaler:
     def __init__(self, scale=1000.0):
         """
         Class for applying angle scaling to residuals, Jacobians, and delta_x updates.
-        The default scale converts radians to milliradians.
-        This scaling is done to improve the condition of the H matrix.
+
+        The default scale converts radians to milliradians, improving the numerical
+        conditioning of the system matrix H (especially during LM optimization).
+        Scaling ensures that angle-related components have magnitudes similar to
+        position-related components, reducing anisotropy in the optimization problem.
         """
         self.scale = scale
 
     def scale_controls(self, e_ij, A_ij, B_ij, Omega_ij):
         """
-        Scale angle component (index 2) in motion residuals and Jacobians.
-        Applies:
-            - residual: e_ij[2] *= scale
-            - Jacobians: A_ij[2, :] *= scale, B_ij[2, :] *= scale
-            - Info matrix: S_inv.T @ Omega @ S_inv
+        Scale the angle component (index 2) in motion constraints.
+
+        This scales:
+            - The angle residual e_ij[2] ← e_ij[2] * scale
+            - The corresponding Jacobian rows A_ij[2,:] and B_ij[2,:]
+            - The information matrix by transforming it with S⁻¹ᵀ * Ω * S⁻¹,
+              where S⁻¹ is a diagonal scaling matrix
+
+        This improves numerical stability when angles are measured in radians
+        and typically have smaller magnitudes than x/y positions.
         """
         e_ij[2] *= self.scale
         A_ij[2, :] *= self.scale
@@ -28,11 +36,14 @@ class AngleScaler:
 
     def scale_observation(self, e_ik, J_i, Omega_ik):
         """
-        Scale bearing component (index 1) in observation residuals and Jacobians.
-        Applies:
-            - residual: e_ik[1] *= scale
-            - Jacobian: J_i[1, :] *= scale
-            - Info matrix: S_inv.T @ Omega @ S_inv
+        Scale the angle component (index 1) in observation constraints.
+
+        This scales:
+            - The bearing residual e_ik[1] ← e_ik[1] * scale
+            - The corresponding Jacobian row J_i[1,:]
+            - The information matrix using the same diagonal scaling technique
+
+        This brings the angle-bearing error into the same numeric range as position.
         """
         e_ik[1] *= self.scale
         J_i[1, :] *= self.scale
@@ -44,8 +55,11 @@ class AngleScaler:
 
     def unscale_delta_x(self, delta_x):
         """
-        Unscale angle components in the update vector (every 3rd index starting from 2).
-        Converts from milliradians back to radians.
+        Unscale the angle component in the delta_x update vector.
+
+        Every third entry (starting at index 2) represents θ_i in the flattened pose vector.
+        This method converts Δθ from milliradians back to radians:
+            delta_x[3*i + 2] ← delta_x[3*i + 2] / scale
         """
         n = len(delta_x) // 3
         for i in range(n):
