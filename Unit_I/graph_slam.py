@@ -177,47 +177,11 @@ class Graph:
 
         return A_ij, B_ij
 
-    def controls_angle_scaling(self, e_ij, A_ij, B_ij, Omega_ij):
-        """Scale angle part of e_ij and Jacobians
-        converts the angles from radians to mili-radians
-        This scaling improves the condition of the H matrix
-        """
-        scale = self.angle_scale
-        e_ij[2] *= scale # Scale the angle residual (mrad)
-        A_ij[2, :] *= scale  # Scale the angle Jacobian row
-        B_ij[2, :] *= scale # Scale the angle Jacobian row
-        S_inv = np.diag([1.0, 1.0, 1.0 / scale])
-        Omega_ij = S_inv.T @ Omega_ij @ S_inv # Scale the information matrix
-        return e_ij, A_ij, B_ij, Omega_ij
-
-    def observation_angle_scaling(self, e_ik, J_i, Omega_ik):
-        """ANGLE SCALING
-        converts the angles from radians to mili-radians
-        This scaling improves the condition of the H matrix
-        """
-        scale = self.angle_scale
-        e_ik[1] *= scale # Scale the bearing residual (mrad)
-        J_i[1, :] *= scale  # Scale the bearing Jacobian row
-        S_inv = np.diag([1.0, 1.0 / scale])# Scale the information matrix
-        Omega_ik = S_inv.T @ Omega_ik @ S_inv
-        return e_ik, J_i, Omega_ik
-
-    def delta_x_angle_unscaling(self, delta_x):
-        """ Unscale the angle part of delta_x """
-        scale = self.angle_scale
-        size = int(len(delta_x) / 3) # size is the number of poses
-        for i in range(size):
-            delta_x[3 * i + 2] *= 1/scale  # Convert back from mrad to rad
-        return delta_x
-
     def compute_H_b_of_controls(self):
         """
         Build the linear system H and b for Graph-Based SLAM.
         Follows directly from the derivation in the README.md
         """
-        # N = 3 * len(self.poses)
-        # self.H = np.zeros((N, N))
-        # self.b = np.zeros((N, ))
 
         for constraint in self.constraints:
             i, j, z_ij, Omega_ij = constraint
@@ -230,7 +194,7 @@ class Graph:
             e_ij = self.compute_error(constraint)
             A_ij, B_ij = Graph.compute_jacobians(xi, xj)
 
-            #e_ij, A_ij, B_ij, Omega_ij = self.controls_angle_scaling(e_ij, A_ij, B_ij, Omega_ij)
+            # Scale the angle to provide better condition of the H matrix
             e_ij, A_ij, B_ij, Omega_ij = self.angle_scaler.scale_controls(e_ij, A_ij, B_ij, Omega_ij)
 
             # Compute blocks for H
@@ -270,7 +234,7 @@ class Graph:
             # 2x3 Jacobian: the derivative of observation error with respect to pose x_i
             J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
 
-            #e_ik, J_i, Omega_ik = self.observation_angle_scaling(e_ik, J_i, Omega_ik)
+            # Scale the angle to provide better condition of the H matrix
             e_ik, J_i, Omega_ik = self.angle_scaler.scale_observation(e_ik, J_i, Omega_ik)
 
 
@@ -315,7 +279,8 @@ class Graph:
 
             # Solve linear system with damped matrix
             delta_x = lm.solve_damped(-self.b)
-            #delta_x = self.delta_x_angle_unscaling(delta_x)
+
+            # Unscale the angle part of delta_x. Scaling is done to improve the condition of the H matrix.
             delta_x = self.angle_scaler.unscale_delta_x(delta_x)
             
             # compute cost and evaluate the current update
@@ -624,6 +589,39 @@ if __name__ == '__main__':
 ##################################################################
 #     DEPRICATED CODE
 ##################################################################
+
+   # def controls_angle_scaling(self, e_ij, A_ij, B_ij, Omega_ij):
+    #     """Scale angle part of e_ij and Jacobians
+    #     converts the angles from radians to mili-radians
+    #     This scaling improves the condition of the H matrix
+    #     """
+    #     scale = self.angle_scale
+    #     e_ij[2] *= scale # Scale the angle residual (mrad)
+    #     A_ij[2, :] *= scale  # Scale the angle Jacobian row
+    #     B_ij[2, :] *= scale # Scale the angle Jacobian row
+    #     S_inv = np.diag([1.0, 1.0, 1.0 / scale])
+    #     Omega_ij = S_inv.T @ Omega_ij @ S_inv # Scale the information matrix
+    #     return e_ij, A_ij, B_ij, Omega_ij
+
+    # def observation_angle_scaling(self, e_ik, J_i, Omega_ik):
+    #     """ANGLE SCALING
+    #     converts the angles from radians to mili-radians
+    #     This scaling improves the condition of the H matrix
+    #     """
+    #     scale = self.angle_scale
+    #     e_ik[1] *= scale # Scale the bearing residual (mrad)
+    #     J_i[1, :] *= scale  # Scale the bearing Jacobian row
+    #     S_inv = np.diag([1.0, 1.0 / scale])# Scale the information matrix
+    #     Omega_ik = S_inv.T @ Omega_ik @ S_inv
+    #     return e_ik, J_i, Omega_ik
+
+    # def delta_x_angle_unscaling(self, delta_x):
+    #     """ Unscale the angle part of delta_x """
+    #     scale = self.angle_scale
+    #     size = int(len(delta_x) / 3) # size is the number of poses
+    #     for i in range(size):
+    #         delta_x[3 * i + 2] *= 1/scale  # Convert back from mrad to rad
+    #     return delta_x
 
     # def add_constraint(self, i, j, z_ij, Omega_ij):
     #     """

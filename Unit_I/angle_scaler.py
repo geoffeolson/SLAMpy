@@ -5,6 +5,7 @@ class AngleScaler:
         """
         Class for applying angle scaling to residuals, Jacobians, and delta_x updates.
         The default scale converts radians to milliradians.
+        This scaling is done to improve the condition of the H matrix.
         """
         self.scale = scale
 
