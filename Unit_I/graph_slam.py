@@ -15,6 +15,7 @@ import numpy as np
 import os
 from itertools import combinations
 from levenberg_marquardt import LevenbergMarquardt
+from angle_scaler import AngleScaler
 
 class Graph:
     def __init__(self):
@@ -26,7 +27,7 @@ class Graph:
         self.scanner_displacement = 30.0     # Offset of observation scanner from robot center
         self.H = None                        # Matrix for system of equations used for solver
         self.b = None                        # Matrix for system of equations used for solver
-        self.angle_scale = 1000
+        self.angle_scaler = AngleScaler(1000)
         ############################################################################
         # REMOVE TESTING CODE
         #self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
@@ -229,7 +230,8 @@ class Graph:
             e_ij = self.compute_error(constraint)
             A_ij, B_ij = Graph.compute_jacobians(xi, xj)
 
-            e_ij, A_ij, B_ij, Omega_ij = self.controls_angle_scaling(e_ij, A_ij, B_ij, Omega_ij)
+            #e_ij, A_ij, B_ij, Omega_ij = self.controls_angle_scaling(e_ij, A_ij, B_ij, Omega_ij)
+            e_ij, A_ij, B_ij, Omega_ij = self.angle_scaler.scale_controls(e_ij, A_ij, B_ij, Omega_ij)
 
             # Compute blocks for H
             H_ii = A_ij.T @ Omega_ij @ A_ij
@@ -268,7 +270,9 @@ class Graph:
             # 2x3 Jacobian: the derivative of observation error with respect to pose x_i
             J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
 
-            e_ik, J_i, Omega_ik = self.observation_angle_scaling(e_ik, J_i, Omega_ik)
+            #e_ik, J_i, Omega_ik = self.observation_angle_scaling(e_ik, J_i, Omega_ik)
+            e_ik, J_i, Omega_ik = self.angle_scaler.scale_observation(e_ik, J_i, Omega_ik)
+
 
             # Compute contribution to H and b
             H_ii = J_i.T @ Omega_ik @ J_i
@@ -311,15 +315,18 @@ class Graph:
 
             # Solve linear system with damped matrix
             delta_x = lm.solve_damped(-self.b)
-            delta_x = self.delta_x_angle_unscaling(delta_x)
-
+            #delta_x = self.delta_x_angle_unscaling(delta_x)
+            delta_x = self.angle_scaler.unscale_delta_x(delta_x)
+            
             # compute cost and evaluate the current update
             cost = np.linalg.norm(delta_x)
             lm.set_cost(cost)
 
             # Debug output
             if debug:
-                self.print_iteration(iteration, cost, lm.get_lambda())
+                #self.print_iteration(iteration, cost, lm.get_lambda())
+                #get_summary_string()
+                print( lm.get_iteration_info(iteration, cost))
                 self.plot_comparison()
 
             # Stop if converged
@@ -330,6 +337,9 @@ class Graph:
             # Apply Δx to poses if accepted
             if lm.cost_is_decreasing():
                 self.apply_delta_to_poses(delta_x)
+
+        if debug: summary = lm.get_summary()
+        return summary
 
     def apply_delta_to_poses(self, delta):
         N = len(self.poses)
