@@ -9,9 +9,70 @@ from extended_kalman_filter import EKF
 from lego_robot import *
 from numpy import pi, sin, cos, pi, atan2
 from numpy.linalg import norm, inv, solve
+import numpy as np        
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 from itertools import combinations
+from levenberg_marquardt import LevenbergMarquardt
+
+class LevenbergMarquardt_Old:
+    def __init__(self):
+        """
+        Class to encapsulate all the generic logic for a Levenberg Marquardt solver.
+        It does not contain any information for a specific solver application.
+        """
+        self.lambda_max = 1e+6 
+        self.lambda_min = 1e-7
+        self.lambda_init = 1e-4  # Initial lambda value
+        self.cost_tol = 1e-3  # Cost tolerance criteria for convergence
+        self.delta_cost_tol = 1e-4  # Change in cost tolerance criteria for convergence
+        self.prev_cost = 1e+10  # Previous cost value to compare against for computing delta_cost
+        self.lamb = self.lambda_init # Current lambda value
+        self.max_iterations = 100  # Maximum number of solver iterations
+        self.update = True  # Use the computed delta x, so need to also recompute jacobians
+        self.converged = False  # Solver has converged to a solution so stop solver
+        self.lambda_incr_factor = 10  # Factor to increase lambda when cost increases
+        self.lambda_decr_factor = 0.5  # Factor to decrease lambda when cost decreases
+
+    def set_cost(self, cost):
+        delta_cost = cost - self.prev_cost
+
+        # Cost is decreasing
+        if delta_cost < 0:
+            # Use the computed delta x value and decrease lambda to converge faster
+            self.lamb = max(self.lambda_min, self.lamb * self.lambda_decr_factor) 
+            self.update = True
+
+            # Check stopping criteria
+            if ((cost < self.cost_tol) or (abs(delta_cost) < self.delta_cost_tol)):
+                # Solver has converged to a solution, so stop solver
+                self.converged = True
+                self.update = False
+
+        # Cost is inreasing
+        else:
+            # Don't accept current update,
+            # and increase lambda to prevent the overshoot that is increaing cost
+            self.lamb = min(self.lambda_max, self.lamb * self.lambda_incr_factor)
+            self.update = False
+
+        # Only if the new update is accepted, save the current cost as the previous cost for next iteration.
+        # We don't want to store the previous cost for bad updates.
+        if self.update:
+            self.prev_cost = cost
+
+    def get_lambda(self):
+        return self.lamb
+
+    def get_max_iterations(self):
+        return self.max_iterations
+
+    def last_update_was_accepted(self):
+        return self.update
+
+    def cost_met_stop_criteria(self):
+        return self.converged
 
 class Graph:
     def __init__(self):
@@ -23,12 +84,14 @@ class Graph:
         self.scanner_displacement = 30.0     # Offset of observation scanner from robot center
         self.H = None                        # Matrix for system of equations used for solver
         self.b = None                        # Matrix for system of equations used for solver
-
+        self.angle_scale = 1000
         ############################################################################
-        #TESTING CODE REMOVE
+        # REMOVE TESTING CODE
         #self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
         self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
         ############################################################################
+
+
    
     def compute_relative_pose(self, x_i, x_j):
         """
@@ -98,7 +161,7 @@ class Graph:
         Sigma_ij: 2x2 covariance matrix of the observation [range, bearing].
         """
         ##################################################################
-        #   TESTING CODE REMOVE
+        #  REMOVE TESTING CODE 
         #Sigma_ij *= 0.1
         ####################################################################
         #Compute the information matrix from the covariance matrix
@@ -171,7 +234,40 @@ class Graph:
 
         return A_ij, B_ij
 
-    def controls_linear_system(self):
+    def controls_angle_scaling(self, e_ij, A_ij, B_ij, Omega_ij):
+        """Scale angle part of e_ij and Jacobians
+        converts the angles from radians to mili-radians
+        This scaling improves the condition of the H matrix
+        """
+        scale = self.angle_scale
+        e_ij[2] *= scale # Scale the angle residual (mrad)
+        A_ij[2, :] *= scale  # Scale the angle Jacobian row
+        B_ij[2, :] *= scale # Scale the angle Jacobian row
+        S_inv = np.diag([1.0, 1.0, 1.0 / scale])
+        Omega_ij = S_inv.T @ Omega_ij @ S_inv # Scale the information matrix
+        return e_ij, A_ij, B_ij, Omega_ij
+
+    def observation_angle_scaling(self, e_ik, J_i, Omega_ik):
+        """ANGLE SCALING
+        converts the angles from radians to mili-radians
+        This scaling improves the condition of the H matrix
+        """
+        scale = self.angle_scale
+        e_ik[1] *= scale # Scale the bearing residual (mrad)
+        J_i[1, :] *= scale  # Scale the bearing Jacobian row
+        S_inv = np.diag([1.0, 1.0 / scale])# Scale the information matrix
+        Omega_ik = S_inv.T @ Omega_ik @ S_inv
+        return e_ik, J_i, Omega_ik
+
+    def delta_x_angle_unscaling(self, delta_x):
+        """ Unscale the angle part of delta_x """
+        scale = self.angle_scale
+        size = int(len(delta_x) / 3) # size is the number of poses
+        for i in range(size):
+            delta_x[3 * i + 2] *= 1/scale  # Convert back from mrad to rad
+        return delta_x
+
+    def compute_H_b_of_controls(self):
         """
         Build the linear system H and b for Graph-Based SLAM.
         Follows directly from the derivation in the README.md
@@ -191,13 +287,7 @@ class Graph:
             e_ij = self.compute_error(constraint)
             A_ij, B_ij = Graph.compute_jacobians(xi, xj)
 
-            ############################################################################
-            # x,y,theta = e_ij
-            # x = x.item()
-            # y = y.item()
-            # theta = (theta * 180 / pi).item()
-            # if i == 1: breakpoint()
-            #########################################################################
+            e_ij, A_ij, B_ij, Omega_ij = self.controls_angle_scaling(e_ij, A_ij, B_ij, Omega_ij)
 
             # Compute blocks for H
             H_ii = A_ij.T @ Omega_ij @ A_ij
@@ -221,7 +311,7 @@ class Graph:
             self.b[i_idx] += b_i
             self.b[j_idx] += b_j
 
-    def observations_linear_system(self):
+    def compute_H_b_of_observations(self):
         """
         Add contributions from observation constraints to the linear system H and b.
         """
@@ -233,16 +323,10 @@ class Graph:
             e_ik = z_ik - z_pred
             e_ik[1] = (e_ik[1] + pi) % (2 * pi) - pi
 
-            #####################################################################
-            # rng, bear = e_ik
-            # rng = rng.item()
-            # bear = (bear * 180 / pi).item()
-            # x = (x_k[0]).item()
-            # y = (x_k[1]).item()
-            #####################################################################
-
-            # Jacobian: the derivative of observation error with respect to pose x_i
+            # 2x3 Jacobian: the derivative of observation error with respect to pose x_i
             J_i = -EKF.dh_dstate(x_i, x_k, self.scanner_displacement )
+
+            e_ik, J_i, Omega_ik = self.observation_angle_scaling(e_ik, J_i, Omega_ik)
 
             # Compute contribution to H and b
             H_ii = J_i.T @ Omega_ik @ J_i
@@ -260,63 +344,65 @@ class Graph:
         self.H[s,s] = np.eye(3)
         self.b[s]   = 0
 
-    def solve(self, debug = False, max_iterations=10, tol=1e-4):
+    def solve(self, debug=False):
         """
-        Gauss-Newton optimizer for Graph-Based SLAM.
-        Follows the full system described in README.md.
+        Levenberg-Marquardt solver for Graph-Based SLAM.
+        Efficient implementation: modifies only diagonal of H and restores it properly.
         """
-        if debug: self.print_iteration(-1, 0)
         N = len(self.poses)
-        self.H = np.zeros((3*N, 3*N))
-        self.b = np.zeros((3*N, ))
-        if debug: self.plot_comparison() #show plot of initial data before optimization 
-        for iteration in range(max_iterations):
+        self.H = np.zeros((3 * N, 3 * N))
+        self.b = np.zeros((3 * N,))
+        lm = LevenbergMarquardt()
 
-            # Build linear system: H Δx = -b
-            self.controls_linear_system()
-            self.observations_linear_system()
-            self.anchor_pose(0) # anchor the first pose
+        if debug:
+            self.print_iteration(-1, 0, 0)
+            self.plot_comparison()
 
-            # Solve Linear System: H Δx = -b
-            delta_x = np.linalg.solve(self.H, -self.b)
-            neg_b = self.H @ delta_x
+        for iteration in range(lm.get_max_iterations()):
 
+            # Recompute Jacobian and residuals if last update was accepted
+            if lm.cost_decreased():
+                self.compute_H_b_of_controls()
+                self.compute_H_b_of_observations()
+                self.anchor_pose(0)
+                lm.set_matrix(self.H)
 
-            #####################################################################
-            #TESTING CODE REMOVE
-            delta_x *= 0.5
-            #######################################################################
+            # Dampen H by modifying a local copy of the diagonal
+            # H, L = self.H.copy(), lm.get_lambda()
+            # H[np.diag_indices_from(H)] *= (1.0 + L)
 
+            # Solve the damped linear system
+            delta_x = np.linalg.solve( lm.get_damped_matrix(), -self.b)
+            delta_x = self.delta_x_angle_unscaling(delta_x)
 
-            # Apply updates to poses
-            for i in range(N):
-                idx = slice(3 * i, 3 * i + 3)
-                dx_i = delta_x[idx]
-                self.poses[i] += dx_i
+            # compute cost and evaluate the current update
+            cost = np.linalg.norm(delta_x)
+            lm.set_cost(cost)
 
-            # Check for convergence
-            norm_dx = np.linalg.norm(delta_x)
-            if debug: 
-                self.print_iteration(iteration, norm_dx)
-                if iteration >= 0:
-                    self.plot_x_y_theta(delta_x,"Delta X")
-                    #self.plot_x_y_theta(neg_b,"Estimated -b")
-                    #self.plot_x_y_theta(-self.b,"Actual -b ")
-                    self.plot_comparison()
-            if norm_dx < tol:
-                print(f"Converged in {iteration+1} iterations.")
+            # Debug output
+            if debug:
+                self.print_iteration(iteration, cost, lm.get_lambda())
+                self.plot_comparison()
+
+            # Stop if converged
+            if lm.cost_met_stop_criteria():
+                print(f"Converged in {iteration + 1} iterations.")
                 break
-        
 
-    def print_iteration(self, i, norm_dx):
+            # Apply Δx to poses if accepted
+            if lm.cost_decreased():
+                for i in range(N):
+                    idx = slice(3 * i, 3 * i + 3)
+                    self.poses[i] += delta_x[idx]
+
+
+    def print_iteration(self, i, norm_dx, lamb):
         x = self.poses
         if self.H is not None: condition = np.linalg.cond(self.H)
         else: condition = 0
-        print(f"{i+1}. dx_norm: {norm_dx:.6f}, condition: {condition:.1e} Pose_1:[{x[1][0]:.6f}, {x[1][1]:.6f}, {x[1][2]:.6f}], Pose_2:[{x[2][0]:.6f}, {x[2][1]:.6f}, {x[2][2]:.6f}]")
+        print(f"{i+1}. cost:{norm_dx:.6f}, condition:{condition:.1e}, lambda:{lamb:.1e}")
 
     def plot_comparison(self):
-        import matplotlib.pyplot as plt
-        import numpy as np
         fig, ax = plt.subplots() 
 
         # plot the poses from Graph SLAM
@@ -404,30 +490,30 @@ def test_object_creation():
        x1 → x2 : [ 0.1 -0.1  0.0 ]
     """
     # create Graph Slam object
-    gs = Graph()
+    # gs = Graph()
 
-    #Add Poses
-    x0 = [0.0, 0.0, 0.0]   # origin
-    x1 = [1.0, 0.0, 0.0]   # 1 meter forward
-    x2 = [2.0, 0.0, 0.0]   # 2 meter forward
+    # #Add Poses
+    # x0 = [0.0, 0.0, 0.0]   # origin
+    # x1 = [1.0, 0.0, 0.0]   # 1 meter forward
+    # x2 = [2.0, 0.0, 0.0]   # 2 meter forward
 
-    gs.add_pose(x0)
-    gs.add_pose(x1)
-    gs.add_pose(x2)
+    # gs.add_pose(x0)
+    # gs.add_pose(x1)
+    # gs.add_pose(x2)
 
-    #Add constraint
-    z_ij = [0.9, 0.1, 5 * pi / 180]
-    Omega_ij = np.diag([1.0, 1.0, 1.0])
-    gs.add_constraint(0, 1, z_ij, Omega_ij)
+    # #Add constraint
+    # z_ij = [0.9, 0.1, 5 * pi / 180]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(0, 1, z_ij, Omega_ij)
 
-    z_ij = [1.1, -0.1, 0.0]
-    Omega_ij = np.diag([1.0, 1.0, 1.0])
-    gs.add_constraint(1, 2, z_ij, Omega_ij)
+    # z_ij = [1.1, -0.1, 0.0]
+    # Omega_ij = np.diag([1.0, 1.0, 1.0])
+    # gs.add_constraint(1, 2, z_ij, Omega_ij)
 
-    #print Results
-    gs.print_summary()
+    # #print Results
+    # gs.print_summary()
 
-    return gs
+    # return gs
 
 def test_jacobians():
     """
@@ -503,24 +589,7 @@ def test_jacobians():
     print("Difference B:")
     print(B_analytic - B_numeric)
 
-def test_linear_system():
-    """
-    Unit test: Verify correct construction of H and b.
-    This test simply runs the function and prints the outputs for inspection.
-    """
 
-    # Build Graph SLAM object
-    gs = test_object_creation()
-
-    # Build system
-    H, b = gs.controls_linear_system()
-
-    # Print system matrices for inspection
-    print("\n\n*********** LINEAR SYSTEM TEST ***********")
-    print("Information matrix H:")
-    print(H)
-    print("\nRight-hand side vector b:")
-    print(b)
 
 def test_solver():
     """
@@ -536,7 +605,7 @@ def test_solver():
 
     # Print initial error
     print("\nInitial state:")
-    gs.print_summary()
+    #gs.print_summary()
 
     # Run optimization
     gs.solve(max_iterations=10, tol=1e-6)
@@ -662,3 +731,184 @@ if __name__ == '__main__':
 #             x, y, θ = ekf.state
 #             line = f"F {x} {y} {θ}\n"
 #             f.write(line)
+
+
+    # def solve3(self, debug=False):
+    #     """
+    #     Levenberg-Marquardt solver for Graph-Based SLAM.
+    #     Efficient implementation: only modifies diagonal of H and restores it if update is rejected.
+    #     """
+    #     N = len(self.poses)
+    #     self.H = np.zeros((3 * N, 3 * N))
+    #     self.b = np.zeros((3 * N,))
+    #     lm = LevenbergMarquardt()
+
+    #     if debug:
+    #         self.print_iteration(-1, 0, 0)
+    #         #self.plot_comparison()
+
+    #     for iteration in range(lm.get_max_iterations()):
+
+    #         # Recompute Jacobian and residuals if last update was accepted
+    #         if lm.last_update_was_accepted():
+    #             self.compute_H_b_of_controls()
+    #             self.compute_H_b_of_observations()
+    #             self.anchor_pose(0)
+
+    #         # Apply Marquardt damping to H by modifying only the diagonal
+    #         H_damped = self.H.copy()
+    #         diag_indices = np.diag_indices_from(self.H)
+    #         #original_diag = self.H[diag_indices].copy()
+    #         #self.H[diag_indices] *= (1.0 + lm.get_lambda())
+    #         H_damped[diag_indices] += lm.get_lambda()
+
+    #         # Solve the damped linear system
+    #         delta_x = np.linalg.solve(self.H, -self.b)
+    #         delta_x = self.delta_x_angle_unscaling(delta_x)
+    #         cost = np.linalg.norm(delta_x)
+
+    #         # Evaluate new delta_x and update LM logic
+    #         lm.set_cost(cost)
+
+    #         # # Restore diagonal if update was not accepted
+    #         # if not lm.last_update_was_accepted():
+    #         #     self.H[diag_indices] = original_diag
+
+    #         # Debug output
+    #         if debug:
+    #             self.print_iteration(iteration, cost, lm.get_lambda())
+    #             #self.plot_comparison()
+
+    #         # Stop if converged
+    #         if lm.solver_has_converged():
+    #             print(f"Converged in {iteration + 1} iterations.")
+    #             break
+
+    #         # Apply Δx to poses if accepted
+    #         if lm.last_update_was_accepted():
+    #             for i in range(N):
+    #                 idx = slice(3 * i, 3 * i + 3)
+    #                 self.poses[i] += delta_x[idx]
+
+
+    # def solve2(self, debug = False):
+    #     """
+    #     Runs the Levenberg Marquardt Solver algorithm to optimize the poses in the graph.
+    #     """
+    #     # INITIALIZE
+    #     N = len(self.poses)
+    #     self.H = np.zeros((3*N, 3*N))
+    #     self.b = np.zeros((3*N, )) 
+    #     lm = LevenbergMarquardt() # LM object handles logic for Levenberg Marquardt algorithm
+
+    #     if debug:
+    #         self.print_iteration(-1, 0,0)
+    #         self.plot_comparison() # Show plot of initial data before optimization
+
+    #     #MAIN SOLVER LOOP
+    #     for iteration in range(lm.max_iterations):
+
+    #         # Recompute Jacobian and residual
+            
+    #         if lm.last_update_was_accepted():
+    #             self.compute_H_b_of_controls()
+    #             self.compute_H_b_of_observations()
+    #             self.anchor_pose(0) # anchor the first pose
+
+    #         # Solve Linear System of Levenberg Marquardt: (H + λI) * Δx = -b
+    #         H, L, I, b = self.H, lm.get_lambda(), np.eye(3 * N), self.b
+    #         delta_x = np.linalg.solve(H + L * I, -b)  
+    #         delta_x = self.delta_x_angle_unscaling(delta_x) # Unscale the angles in delta x
+    #         cost = np.linalg.norm(delta_x)  # Compute the optimization cost
+    #         lm.set_cost(cost)  # Recompute LM logic based on the new cost
+
+    #         # Output debug information
+    #         if debug:
+    #             self.print_iteration(iteration, cost,lm.get_lambda())
+    #             if iteration >= 0:
+    #                 #self.plot_x_y_theta(delta_x,"Delta X")
+    #                 #self.plot_x_y_theta(-self.b," -b ")
+    #                 self.plot_comparison()
+
+    #         # Stop the solver if LM has converged
+    #         if lm.solver_has_converged():
+    #             print(f"Converged in {iteration+1} iterations.")
+    #             break
+
+    #         # Apply delta_x updates to poses
+    #         if lm.last_update_was_accepted():
+    #             for i in range(N):
+    #                 idx = slice(3 * i, 3 * i + 3)
+    #                 dx_i = delta_x[idx]
+    #                 self.poses[i] += dx_i
+
+
+
+    # def solve1(self, debug = False, max_iterations=10):
+    #     """
+    #     Runs the Levenberg Marquardt Solver algorithm to optimize the poses in the graph.
+    #     """
+    #     # INITIALIZE
+    #     N = len(self.poses)
+    #     self.H = np.zeros((3*N, 3*N))
+    #     self.b = np.zeros((3*N, )) 
+    #     lm = LevenbergMarquardt() # LM object handles logic for Levenberg Marquardt algorithm
+
+    #     if debug:
+    #         self.print_iteration(-1, 0,0)
+    #         self.plot_comparison() # Show plot of initial data before optimization
+
+    #     #MAIN SOLVER LOOP
+    #     for iteration in range(lm.max_iterations):
+
+    #         # Recompute Jacobian and residual
+    #         if lm.jacobian_and_residual_is_recomputed():
+    #             self.compute_H_b_of_controls()
+    #             self.compute_H_b_of_observations()
+    #             self.anchor_pose(0) # anchor the first pose
+
+    #         # Solve Linear System of Levenberg Marquardt: (H + λI) * Δx = -b
+    #         H, L, I, b = self.H, lm.get_lambda(), np.eye(3 * N), self.b
+    #         delta_x = np.linalg.solve(H + L * I, -b) 
+    #         delta_x = self.delta_x_angle_unscaling(delta_x) # Unscale the angles in delta x
+    #         cost = np.linalg.norm(delta_x)  # Compute the optimization cost
+    #         lm.set_cost(cost)  # Recompute LM logic based on the new cost
+
+    #         # Output debug information
+    #         if debug:
+    #             self.print_iteration(iteration, cost,lm.get_lambda())
+    #             if iteration >= 0:
+    #                 #self.plot_x_y_theta(delta_x,"Delta X")
+    #                 #self.plot_x_y_theta(-self.b," -b ")
+    #                 self.plot_comparison()
+
+    #         # Stop the solver if LM has converged
+    #         if lm.solver_has_converged():
+    #             print(f"Converged in {iteration+1} iterations.")
+    #             break
+
+    #         # Apply delta_x updates to poses
+    #         if lm.delta_x_is_applied():
+    #             for i in range(N):
+    #                 idx = slice(3 * i, 3 * i + 3)
+    #                 dx_i = delta_x[idx]
+    #                 self.poses[i] += dx_i
+
+    # def test_linear_system():
+    # """
+    # Unit test: Verify correct construction of H and b.
+    # This test simply runs the function and prints the outputs for inspection.
+    # """
+
+    # # Build Graph SLAM object
+    # gs = test_object_creation()
+
+    # # Build system
+    # H, b = gs.controls_linear_system()
+
+    # # Print system matrices for inspection
+    # print("\n\n*********** LINEAR SYSTEM TEST ***********")
+    # print("Information matrix H:")
+    # print(H)
+    # print("\nRight-hand side vector b:")
+    # print(b)

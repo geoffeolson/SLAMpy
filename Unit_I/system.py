@@ -80,8 +80,10 @@ class System:
         self.plot_motion_control()
         self.graph_slam.ekf_states = self.states.copy()
         self.graph_slam.ekf_states.insert(0,self.ekf.initial_state)
-        self.graph_slam.solve(self.debug, max_iterations=50, tol=0.001)
-        if self.debug: self.graph_slam.print_summary()
+        self.graph_slam.solve(self.debug)
+        if self.debug: 
+            self.graph_slam.print_summary()
+            self.graph_slam.plot_comparison()
 
     def get_count(self):
         if self.sim:
