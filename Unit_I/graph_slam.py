@@ -309,12 +309,7 @@ class Graph:
                 self.anchor_pose(0)
                 lm.set_matrix(self.H)
 
-            # Dampen H by modifying a local copy of the diagonal
-            # H, L = self.H.copy(), lm.get_lambda()
-            # H[np.diag_indices_from(H)] *= (1.0 + L)
-
-            # Solve the damped linear system
-            #delta_x = np.linalg.solve( lm.get_damped_matrix(), -self.b)
+            # Solve linear system with damped matrix
             delta_x = lm.solve_damped(-self.b)
             delta_x = self.delta_x_angle_unscaling(delta_x)
 
@@ -335,17 +330,12 @@ class Graph:
             # Apply Δx to poses if accepted
             if lm.cost_is_decreasing():
                 self.apply_delta_to_poses(delta_x)
-                # for i in range(N):
-                #     idx = slice(3 * i, 3 * i + 3)
-                #     self.poses[i] += delta_x[idx]
 
     def apply_delta_to_poses(self, delta):
         N = len(self.poses)
         for i in range(N):
             idx = slice(3 * i, 3 * i + 3)
             self.poses[i] += delta[idx]
-
-
 
     def print_iteration(self, i, norm_dx, lamb):
         x = self.poses
