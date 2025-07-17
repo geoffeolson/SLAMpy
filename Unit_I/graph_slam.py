@@ -16,64 +16,6 @@ import os
 from itertools import combinations
 from levenberg_marquardt import LevenbergMarquardt
 
-class LevenbergMarquardt_Old:
-    def __init__(self):
-        """
-        Class to encapsulate all the generic logic for a Levenberg Marquardt solver.
-        It does not contain any information for a specific solver application.
-        """
-        self.lambda_max = 1e+6 
-        self.lambda_min = 1e-7
-        self.lambda_init = 1e-4  # Initial lambda value
-        self.cost_tol = 1e-3  # Cost tolerance criteria for convergence
-        self.delta_cost_tol = 1e-4  # Change in cost tolerance criteria for convergence
-        self.prev_cost = 1e+10  # Previous cost value to compare against for computing delta_cost
-        self.lamb = self.lambda_init # Current lambda value
-        self.max_iterations = 100  # Maximum number of solver iterations
-        self.update = True  # Use the computed delta x, so need to also recompute jacobians
-        self.converged = False  # Solver has converged to a solution so stop solver
-        self.lambda_incr_factor = 10  # Factor to increase lambda when cost increases
-        self.lambda_decr_factor = 0.5  # Factor to decrease lambda when cost decreases
-
-    def set_cost(self, cost):
-        delta_cost = cost - self.prev_cost
-
-        # Cost is decreasing
-        if delta_cost < 0:
-            # Use the computed delta x value and decrease lambda to converge faster
-            self.lamb = max(self.lambda_min, self.lamb * self.lambda_decr_factor) 
-            self.update = True
-
-            # Check stopping criteria
-            if ((cost < self.cost_tol) or (abs(delta_cost) < self.delta_cost_tol)):
-                # Solver has converged to a solution, so stop solver
-                self.converged = True
-                self.update = False
-
-        # Cost is inreasing
-        else:
-            # Don't accept current update,
-            # and increase lambda to prevent the overshoot that is increaing cost
-            self.lamb = min(self.lambda_max, self.lamb * self.lambda_incr_factor)
-            self.update = False
-
-        # Only if the new update is accepted, save the current cost as the previous cost for next iteration.
-        # We don't want to store the previous cost for bad updates.
-        if self.update:
-            self.prev_cost = cost
-
-    def get_lambda(self):
-        return self.lamb
-
-    def get_max_iterations(self):
-        return self.max_iterations
-
-    def last_update_was_accepted(self):
-        return self.update
-
-    def cost_met_stop_criteria(self):
-        return self.converged
-
 class Graph:
     def __init__(self):
         self.ekf_states = None
@@ -361,7 +303,7 @@ class Graph:
         for iteration in range(lm.get_max_iterations()):
 
             # Recompute Jacobian and residuals if last update was accepted
-            if lm.cost_decreased():
+            if lm.cost_is_decreasing():
                 self.compute_H_b_of_controls()
                 self.compute_H_b_of_observations()
                 self.anchor_pose(0)
@@ -372,7 +314,8 @@ class Graph:
             # H[np.diag_indices_from(H)] *= (1.0 + L)
 
             # Solve the damped linear system
-            delta_x = np.linalg.solve( lm.get_damped_matrix(), -self.b)
+            #delta_x = np.linalg.solve( lm.get_damped_matrix(), -self.b)
+            delta_x = lm.solve_damped(-self.b)
             delta_x = self.delta_x_angle_unscaling(delta_x)
 
             # compute cost and evaluate the current update
@@ -390,10 +333,18 @@ class Graph:
                 break
 
             # Apply Δx to poses if accepted
-            if lm.cost_decreased():
-                for i in range(N):
-                    idx = slice(3 * i, 3 * i + 3)
-                    self.poses[i] += delta_x[idx]
+            if lm.cost_is_decreasing():
+                self.apply_delta_to_poses(delta_x)
+                # for i in range(N):
+                #     idx = slice(3 * i, 3 * i + 3)
+                #     self.poses[i] += delta_x[idx]
+
+    def apply_delta_to_poses(self, delta):
+        N = len(self.poses)
+        for i in range(N):
+            idx = slice(3 * i, 3 * i + 3)
+            self.poses[i] += delta[idx]
+
 
 
     def print_iteration(self, i, norm_dx, lamb):
@@ -912,3 +863,61 @@ if __name__ == '__main__':
     # print(H)
     # print("\nRight-hand side vector b:")
     # print(b)
+
+    # class LevenbergMarquardt_Old:
+    # def __init__(self):
+    #     """
+    #     Class to encapsulate all the generic logic for a Levenberg Marquardt solver.
+    #     It does not contain any information for a specific solver application.
+    #     """
+    #     self.lambda_max = 1e+6 
+    #     self.lambda_min = 1e-7
+    #     self.lambda_init = 1e-4  # Initial lambda value
+    #     self.cost_tol = 1e-3  # Cost tolerance criteria for convergence
+    #     self.delta_cost_tol = 1e-4  # Change in cost tolerance criteria for convergence
+    #     self.prev_cost = 1e+10  # Previous cost value to compare against for computing delta_cost
+    #     self.lamb = self.lambda_init # Current lambda value
+    #     self.max_iterations = 100  # Maximum number of solver iterations
+    #     self.update = True  # Use the computed delta x, so need to also recompute jacobians
+    #     self.converged = False  # Solver has converged to a solution so stop solver
+    #     self.lambda_incr_factor = 10  # Factor to increase lambda when cost increases
+    #     self.lambda_decr_factor = 0.5  # Factor to decrease lambda when cost decreases
+
+    #     def set_cost(self, cost):
+    #     delta_cost = cost - self.prev_cost
+
+    #     # Cost is decreasing
+    #     if delta_cost < 0:
+    #         # Use the computed delta x value and decrease lambda to converge faster
+    #         self.lamb = max(self.lambda_min, self.lamb * self.lambda_decr_factor) 
+    #         self.update = True
+
+    #         # Check stopping criteria
+    #         if ((cost < self.cost_tol) or (abs(delta_cost) < self.delta_cost_tol)):
+    #             # Solver has converged to a solution, so stop solver
+    #             self.converged = True
+    #             self.update = False
+
+    #     # Cost is inreasing
+    #     else:
+    #         # Don't accept current update,
+    #         # and increase lambda to prevent the overshoot that is increaing cost
+    #         self.lamb = min(self.lambda_max, self.lamb * self.lambda_incr_factor)
+    #         self.update = False
+
+    #     # Only if the new update is accepted, save the current cost as the previous cost for next iteration.
+    #     # We don't want to store the previous cost for bad updates.
+    #     if self.update:
+    #         self.prev_cost = cost
+
+    # def get_lambda(self):
+    #     return self.lamb
+
+    # def get_max_iterations(self):
+    #     return self.max_iterations
+
+    # def last_update_was_accepted(self):
+    #     return self.update
+
+    # def cost_met_stop_criteria(self):
+    #     return self.converged
