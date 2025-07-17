@@ -259,10 +259,10 @@ class Graph:
         Levenberg-Marquardt solver for Graph-Based SLAM.
         Efficient implementation: modifies only diagonal of H and restores it properly.
         """
+        lm = LevenbergMarquardt()
         N = len(self.poses)
         self.H = np.zeros((3 * N, 3 * N))
         self.b = np.zeros((3 * N,))
-        lm = LevenbergMarquardt()
 
         if debug:
             self.print_iteration(-1, 0, 0)
@@ -270,20 +270,20 @@ class Graph:
 
         for iteration in range(lm.get_max_iterations()):
 
-            # Recompute Jacobian and residuals if last update was accepted
+            # Recompute Jacobian and residuals only if the cost is decreasing
             if lm.cost_is_decreasing():
                 self.compute_H_b_of_controls()
                 self.compute_H_b_of_observations()
                 self.anchor_pose(0)
                 lm.set_matrix(self.H)
 
-            # Solve linear system with damped matrix
+            # Solve linear system with matrix damped using the levenberg-marquardt method
             delta_x = lm.solve_damped(-self.b)
 
             # Unscale the angle part of delta_x. Scaling is done to improve the condition of the H matrix.
             delta_x = self.angle_scaler.unscale_delta_x(delta_x)
             
-            # compute cost and evaluate the current update
+            # Compute cost and evaluate the cost using levenberg-marquardt method
             cost = np.linalg.norm(delta_x)
             lm.set_cost(cost)
 
@@ -299,7 +299,7 @@ class Graph:
                 print(f"Converged in {iteration + 1} iterations.")
                 break
 
-            # Apply Δx to poses if accepted
+            # Apply Δx to poses only if cost is decreasing 
             if lm.cost_is_decreasing():
                 self.apply_delta_to_poses(delta_x)
 
