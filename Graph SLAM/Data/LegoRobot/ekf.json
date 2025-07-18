@@ -1,5 +1,5 @@
 {
-  "initial_state": [ 0.0, 0.0, 0.0 ],
+  "initial_state": [ 1850.0, 1897.0, 213.0 ],
   "initial_covariance": [ 100.0, 100.0, 10.0 ],
   "ticks_to_mm": 0.349,
   "cylinder_offset": 90.0,

@@ -270,6 +270,7 @@ class Graph:
         for i in range(N):
             idx = slice(3 * i, 3 * i + 3)
             self.poses[i] += delta[idx]
+            self.poses[i][2] = (self.poses[i][2] + pi) % (2 * pi) - pi
 
     def solve(self, debug=False):
         """
@@ -312,8 +313,6 @@ class Graph:
             if lm.cost_met_stop_criteria():
                 print(f"Converged in {iteration + 1} iterations.")
                 b = self.b
-                for i in range(N):
-                    b[3 * i + 2] *= 1/1000000
                 self.plot_x_y_theta(b, "b")
                 self.plot_x_y_theta(delta_x, "delta_x")
                 self.plot_comparison()
@@ -359,6 +358,9 @@ class Graph:
         x = data2[0::3]
         y = data2[1::3]
         theta = data2[2::3]
+        for i in range(len(theta)):
+            theta[i] = ((theta[i] + pi) % (2 * pi) - pi) * 180 / pi
+
         time_step = np.arange(x.shape[0])
 
         # Plot on the left y axis
@@ -372,7 +374,7 @@ class Graph:
 
         #  Plot on the right y axis
         ax2 = ax1.twinx() 
-        ax2.plot(time_step, theta*180/pi, 'r--', label='Theta')
+        ax2.plot(time_step, theta, 'r--', label='Theta')
         ax2.set_ylabel('Theta (deg)', color='b')
         ax2.tick_params(axis='y', labelcolor='b')
         ax2.legend(loc='upper right')
