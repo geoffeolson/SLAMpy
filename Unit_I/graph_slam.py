@@ -28,11 +28,7 @@ class Graph:
         self.H = None                        # Matrix for system of equations used for solver
         self.b = None                        # Matrix for system of equations used for solver
         self.angle_scaler = AngleScaler(1000)
-        ############################################################################
-        # REMOVE TESTING CODE
-        #self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
         self.motion_noise = np.diag([5**2, 5**2, (1.0*pi/180)**2])
-        ############################################################################
 
 
    
@@ -56,16 +52,22 @@ class Graph:
     def add_motion_constraint(self, i, j, x_i, x_j, Sigma_ij):
         """
         Add a motion constraint between the last pose and the new pose x_j.
-        
-        The robot motion model results in a covariance matrix with perfect correlation, 
-        because robot rotation only results from unequal rotation between right and left tracks. 
-        This correlation in the covariance matrix results in a singular matrix that cannot be inverted. 
-        The following code adds a small motion_noise to the covariance matrix, providing 
-        imperfect correlation resulting in a more realistic robot motion model and an invertable matrix.
+
+        The robot’s kinematic model produces a deterministic relationship between wheel motions
+        and pose updates. As a result, the computed motion covariance matrix is rank-deficient—
+        it encodes perfect correlation between translation and rotation, particularly in cases
+        where rotation arises solely from differential wheel movement.
+
+        This perfect correlation leads to a singular (non-invertible) matrix, which cannot be used
+        in downstream calculations such as information matrix construction.
+
+        To resolve this, we add a small isotropic noise term (motion_noise) to the diagonal of
+        the covariance matrix. This ensures numerical invertibility and more realistically reflects
+        uncertainty in real-world robot motion, such as wheel slippage or encoder quantization.
         """
         x_ij = self.compute_relative_pose( x_i, x_j)
         
-        #Compute the information matrix from the covariance matrix
+        #Compute the information matrix by inverting the covariance matrix
         Omega_ij = np.linalg.inv(Sigma_ij + self.motion_noise)
 
         self.constraints.append((i, j, x_ij, Omega_ij))
@@ -97,17 +99,26 @@ class Graph:
 
     def add_observation_constraint(self, pose_index, measurment, landmark, Sigma_ij):
         """
-        Add an observation constraint between a pose and a landmark.
-        pose_index: Index of the robot pose at the time of observation.
-        z_ij: measured observation from the pose to the landmark [range, bearing]
-        x_k: landmark in the global frame [x, y].
-        Sigma_ij: 2x2 covariance matrix of the observation [range, bearing].
+        Add an observation constraint between a robot pose and a landmark.
+
+        This function encodes a relative observation z_ij = [range, bearing]
+        made from a given robot pose (indexed by pose_index) to a known landmark
+        in the global frame (x_k = [x, y]).
+
+        Parameters:
+            pose_index : int
+                Index of the robot pose at the time the observation was made.
+            measurement : array-like of shape (2,)
+                The observed range and bearing to the landmark, relative to the robot pose.
+            landmark : array-like of shape (2,)
+                The [x, y] position of the landmark in the global coordinate frame.
+            Sigma_ij : array-like of shape (2, 2)
+                Covariance matrix of the measurement [range, bearing].
+
+        Notes:
+            The measurement covariance Σ_ij is converted into an information matrix Ω_ij
+            (the inverse of Σ_ij), which is stored along with the observation data.
         """
-        ##################################################################
-        #  REMOVE TESTING CODE 
-        #Sigma_ij *= 0.1
-        ####################################################################
-        #Compute the information matrix from the covariance matrix
         Omega_ij = np.linalg.inv(Sigma_ij)
 
         self.observation_constraints.append((pose_index, np.array(measurment), np.array(landmark), np.array(Omega_ij)))
@@ -136,7 +147,7 @@ class Graph:
     def compute_jacobians(xi, xj):
         """
         Compute 3x3 Jacobians matricies A_ij and B_ij. 
-        Thess are the derivatives of the pose error vector e_ij with respect to the corresponding poses xi and xj.
+        These are the derivatives of the pose error vector e_ij with respect to the corresponding poses xi and xj.
         Given: 
             xi: the pose i [x_i, y_i, theta_i] 
             xj: the pose j [x_j, y_j, theta_j]
@@ -254,6 +265,12 @@ class Graph:
         self.H[s,s] = np.eye(3)
         self.b[s]   = 0
 
+    def add_delta_to_poses(self, delta):
+        N = len(self.poses)
+        for i in range(N):
+            idx = slice(3 * i, 3 * i + 3)
+            self.poses[i] += delta[idx]
+
     def solve(self, debug=False):
         """
         Levenberg-Marquardt solver for Graph-Based SLAM.
@@ -265,7 +282,6 @@ class Graph:
         self.b = np.zeros((3 * N,))
 
         if debug:
-            self.print_iteration(-1, 0, 0)
             self.plot_comparison()
 
         for iteration in range(lm.get_max_iterations()):
@@ -280,7 +296,7 @@ class Graph:
             # Solve linear system with matrix damped using the levenberg-marquardt method
             delta_x = lm.solve_damped(-self.b)
 
-            # Unscale the angle part of delta_x. Scaling is done to improve the condition of the H matrix.
+            # Unscale the angle part of delta_x. Angle scaling is done to improve the condition of the H matrix.
             delta_x = self.angle_scaler.unscale_delta_x(delta_x)
             
             # Compute cost and evaluate the cost using levenberg-marquardt method
@@ -289,34 +305,28 @@ class Graph:
 
             # Debug output
             if debug:
-                #self.print_iteration(iteration, cost, lm.get_lambda())
-                #get_summary_string()
                 print( lm.get_iteration_info(iteration, cost))
-                self.plot_comparison()
+                #self.plot_comparison()
 
             # Stop if converged
             if lm.cost_met_stop_criteria():
                 print(f"Converged in {iteration + 1} iterations.")
+                b = self.b
+                for i in range(N):
+                    b[3 * i + 2] *= 1/1000000
+                self.plot_x_y_theta(b, "b")
+                self.plot_x_y_theta(delta_x, "delta_x")
+                self.plot_comparison()
                 break
 
             # Apply Δx to poses only if cost is decreasing 
             if lm.cost_is_decreasing():
-                self.apply_delta_to_poses(delta_x)
-
-        if debug: summary = lm.get_summary()
-        return summary
-
-    def apply_delta_to_poses(self, delta):
-        N = len(self.poses)
-        for i in range(N):
-            idx = slice(3 * i, 3 * i + 3)
-            self.poses[i] += delta[idx]
-
-    def print_iteration(self, i, norm_dx, lamb):
-        x = self.poses
-        if self.H is not None: condition = np.linalg.cond(self.H)
-        else: condition = 0
-        print(f"{i+1}. cost:{norm_dx:.6f}, condition:{condition:.1e}, lambda:{lamb:.1e}")
+                self.add_delta_to_poses(delta_x)
+        
+        
+        if debug:
+            summary = lm.get_summary()
+            return summary
 
     def plot_comparison(self):
         fig, ax = plt.subplots() 
@@ -585,337 +595,3 @@ if __name__ == '__main__':
     test_jacobians()
     test_linear_system()
     test_solver()
-
-##################################################################
-#     DEPRICATED CODE
-##################################################################
-
-   # def controls_angle_scaling(self, e_ij, A_ij, B_ij, Omega_ij):
-    #     """Scale angle part of e_ij and Jacobians
-    #     converts the angles from radians to mili-radians
-    #     This scaling improves the condition of the H matrix
-    #     """
-    #     scale = self.angle_scale
-    #     e_ij[2] *= scale # Scale the angle residual (mrad)
-    #     A_ij[2, :] *= scale  # Scale the angle Jacobian row
-    #     B_ij[2, :] *= scale # Scale the angle Jacobian row
-    #     S_inv = np.diag([1.0, 1.0, 1.0 / scale])
-    #     Omega_ij = S_inv.T @ Omega_ij @ S_inv # Scale the information matrix
-    #     return e_ij, A_ij, B_ij, Omega_ij
-
-    # def observation_angle_scaling(self, e_ik, J_i, Omega_ik):
-    #     """ANGLE SCALING
-    #     converts the angles from radians to mili-radians
-    #     This scaling improves the condition of the H matrix
-    #     """
-    #     scale = self.angle_scale
-    #     e_ik[1] *= scale # Scale the bearing residual (mrad)
-    #     J_i[1, :] *= scale  # Scale the bearing Jacobian row
-    #     S_inv = np.diag([1.0, 1.0 / scale])# Scale the information matrix
-    #     Omega_ik = S_inv.T @ Omega_ik @ S_inv
-    #     return e_ik, J_i, Omega_ik
-
-    # def delta_x_angle_unscaling(self, delta_x):
-    #     """ Unscale the angle part of delta_x """
-    #     scale = self.angle_scale
-    #     size = int(len(delta_x) / 3) # size is the number of poses
-    #     for i in range(size):
-    #         delta_x[3 * i + 2] *= 1/scale  # Convert back from mrad to rad
-    #     return delta_x
-
-    # def add_constraint(self, i, j, z_ij, Omega_ij):
-    #     """
-    #     Add a relative pose constraint between pose i and pose j.
-    #     z_ij: expected relative motion from i to j
-    #     Omega_ij: 3x3 information matrix
-    #     """
-    #     self.constraints.append((i, j, np.array(z_ij), np.array(Omega_ij)))
-
-
-    # def compute_information_matrix(self, Sigma):
-    #     """
-    #     The robot motion model results in a covariance matrix with perfect correlation, 
-    #     because robot rotation only results from unequal rotation between right and left tracks. 
-    #     This correlation in the covariance matrix results in a singular matrix that cannot be inverted. 
-    #     The following code increases all the variances of the covariance matrix by 20% providing 
-    #     imperfect correlation resulting in a more realistic robot motion model and an invertable matrix.
-    #     """
-    #     # rng = np.arange(Sigma.shape[0])
-    #     # Sigma[rng,rng] *= 1.2
-    #     #Lambda =  1.0e-3
-    #     #Sigma = (Sigma + Lambda * np.eye(Sigma.shape[0]))/(1 + Lambda)
-    #     #Sigma = Sigma + Lambda * np.eye(Sigma.shape[0])
-    #     #Sigma += self.motion_noise
-
-    #     Omega = np.linalg.inv(Sigma + self.motion_noise)
-    #     return Omega
-
-
-# def test_prediction_old():
-#     print("\n*****GRAPH SLAM PREDICTION TEST******")
-#     initial_state = np.array([1850.0, 1897.0, 213.0 / 180.0 * pi])
-#     initial_covariance = np.diag([100.0**2, 100.0**2, (10.0 / 180.0 * pi) ** 2])
-#     ticks_to_mm = 0.349
-#     robot_width = 155.0
-#     motion_factor = 0.35
-#     turn_factor = 0.6
-
-#     ekf = ExtendedKalmanFilter(
-#         initial_state,
-#         initial_covariance,
-#         robot_width,
-#         motion_factor,
-#         turn_factor
-#     )
-
-#     # Load odometry
-#     logfile = LegoLogfile()
-#     logfile.read("robot4_motors.txt")
-
-#     # Output file
-#     with open("graph_slam_prediction.txt", "w") as f:
-#         for ticks in logfile.motor_ticks:
-#             control = np.array(ticks) * ticks_to_mm
-#             ekf.predict(control)
-#             x, y, θ = ekf.state
-#             line = f"F {x} {y} {θ}\n"
-#             f.write(line)
-
-
-    # def solve3(self, debug=False):
-    #     """
-    #     Levenberg-Marquardt solver for Graph-Based SLAM.
-    #     Efficient implementation: only modifies diagonal of H and restores it if update is rejected.
-    #     """
-    #     N = len(self.poses)
-    #     self.H = np.zeros((3 * N, 3 * N))
-    #     self.b = np.zeros((3 * N,))
-    #     lm = LevenbergMarquardt()
-
-    #     if debug:
-    #         self.print_iteration(-1, 0, 0)
-    #         #self.plot_comparison()
-
-    #     for iteration in range(lm.get_max_iterations()):
-
-    #         # Recompute Jacobian and residuals if last update was accepted
-    #         if lm.last_update_was_accepted():
-    #             self.compute_H_b_of_controls()
-    #             self.compute_H_b_of_observations()
-    #             self.anchor_pose(0)
-
-    #         # Apply Marquardt damping to H by modifying only the diagonal
-    #         H_damped = self.H.copy()
-    #         diag_indices = np.diag_indices_from(self.H)
-    #         #original_diag = self.H[diag_indices].copy()
-    #         #self.H[diag_indices] *= (1.0 + lm.get_lambda())
-    #         H_damped[diag_indices] += lm.get_lambda()
-
-    #         # Solve the damped linear system
-    #         delta_x = np.linalg.solve(self.H, -self.b)
-    #         delta_x = self.delta_x_angle_unscaling(delta_x)
-    #         cost = np.linalg.norm(delta_x)
-
-    #         # Evaluate new delta_x and update LM logic
-    #         lm.set_cost(cost)
-
-    #         # # Restore diagonal if update was not accepted
-    #         # if not lm.last_update_was_accepted():
-    #         #     self.H[diag_indices] = original_diag
-
-    #         # Debug output
-    #         if debug:
-    #             self.print_iteration(iteration, cost, lm.get_lambda())
-    #             #self.plot_comparison()
-
-    #         # Stop if converged
-    #         if lm.solver_has_converged():
-    #             print(f"Converged in {iteration + 1} iterations.")
-    #             break
-
-    #         # Apply Δx to poses if accepted
-    #         if lm.last_update_was_accepted():
-    #             for i in range(N):
-    #                 idx = slice(3 * i, 3 * i + 3)
-    #                 self.poses[i] += delta_x[idx]
-
-
-    # def solve2(self, debug = False):
-    #     """
-    #     Runs the Levenberg Marquardt Solver algorithm to optimize the poses in the graph.
-    #     """
-    #     # INITIALIZE
-    #     N = len(self.poses)
-    #     self.H = np.zeros((3*N, 3*N))
-    #     self.b = np.zeros((3*N, )) 
-    #     lm = LevenbergMarquardt() # LM object handles logic for Levenberg Marquardt algorithm
-
-    #     if debug:
-    #         self.print_iteration(-1, 0,0)
-    #         self.plot_comparison() # Show plot of initial data before optimization
-
-    #     #MAIN SOLVER LOOP
-    #     for iteration in range(lm.max_iterations):
-
-    #         # Recompute Jacobian and residual
-            
-    #         if lm.last_update_was_accepted():
-    #             self.compute_H_b_of_controls()
-    #             self.compute_H_b_of_observations()
-    #             self.anchor_pose(0) # anchor the first pose
-
-    #         # Solve Linear System of Levenberg Marquardt: (H + λI) * Δx = -b
-    #         H, L, I, b = self.H, lm.get_lambda(), np.eye(3 * N), self.b
-    #         delta_x = np.linalg.solve(H + L * I, -b)  
-    #         delta_x = self.delta_x_angle_unscaling(delta_x) # Unscale the angles in delta x
-    #         cost = np.linalg.norm(delta_x)  # Compute the optimization cost
-    #         lm.set_cost(cost)  # Recompute LM logic based on the new cost
-
-    #         # Output debug information
-    #         if debug:
-    #             self.print_iteration(iteration, cost,lm.get_lambda())
-    #             if iteration >= 0:
-    #                 #self.plot_x_y_theta(delta_x,"Delta X")
-    #                 #self.plot_x_y_theta(-self.b," -b ")
-    #                 self.plot_comparison()
-
-    #         # Stop the solver if LM has converged
-    #         if lm.solver_has_converged():
-    #             print(f"Converged in {iteration+1} iterations.")
-    #             break
-
-    #         # Apply delta_x updates to poses
-    #         if lm.last_update_was_accepted():
-    #             for i in range(N):
-    #                 idx = slice(3 * i, 3 * i + 3)
-    #                 dx_i = delta_x[idx]
-    #                 self.poses[i] += dx_i
-
-
-
-    # def solve1(self, debug = False, max_iterations=10):
-    #     """
-    #     Runs the Levenberg Marquardt Solver algorithm to optimize the poses in the graph.
-    #     """
-    #     # INITIALIZE
-    #     N = len(self.poses)
-    #     self.H = np.zeros((3*N, 3*N))
-    #     self.b = np.zeros((3*N, )) 
-    #     lm = LevenbergMarquardt() # LM object handles logic for Levenberg Marquardt algorithm
-
-    #     if debug:
-    #         self.print_iteration(-1, 0,0)
-    #         self.plot_comparison() # Show plot of initial data before optimization
-
-    #     #MAIN SOLVER LOOP
-    #     for iteration in range(lm.max_iterations):
-
-    #         # Recompute Jacobian and residual
-    #         if lm.jacobian_and_residual_is_recomputed():
-    #             self.compute_H_b_of_controls()
-    #             self.compute_H_b_of_observations()
-    #             self.anchor_pose(0) # anchor the first pose
-
-    #         # Solve Linear System of Levenberg Marquardt: (H + λI) * Δx = -b
-    #         H, L, I, b = self.H, lm.get_lambda(), np.eye(3 * N), self.b
-    #         delta_x = np.linalg.solve(H + L * I, -b) 
-    #         delta_x = self.delta_x_angle_unscaling(delta_x) # Unscale the angles in delta x
-    #         cost = np.linalg.norm(delta_x)  # Compute the optimization cost
-    #         lm.set_cost(cost)  # Recompute LM logic based on the new cost
-
-    #         # Output debug information
-    #         if debug:
-    #             self.print_iteration(iteration, cost,lm.get_lambda())
-    #             if iteration >= 0:
-    #                 #self.plot_x_y_theta(delta_x,"Delta X")
-    #                 #self.plot_x_y_theta(-self.b," -b ")
-    #                 self.plot_comparison()
-
-    #         # Stop the solver if LM has converged
-    #         if lm.solver_has_converged():
-    #             print(f"Converged in {iteration+1} iterations.")
-    #             break
-
-    #         # Apply delta_x updates to poses
-    #         if lm.delta_x_is_applied():
-    #             for i in range(N):
-    #                 idx = slice(3 * i, 3 * i + 3)
-    #                 dx_i = delta_x[idx]
-    #                 self.poses[i] += dx_i
-
-    # def test_linear_system():
-    # """
-    # Unit test: Verify correct construction of H and b.
-    # This test simply runs the function and prints the outputs for inspection.
-    # """
-
-    # # Build Graph SLAM object
-    # gs = test_object_creation()
-
-    # # Build system
-    # H, b = gs.controls_linear_system()
-
-    # # Print system matrices for inspection
-    # print("\n\n*********** LINEAR SYSTEM TEST ***********")
-    # print("Information matrix H:")
-    # print(H)
-    # print("\nRight-hand side vector b:")
-    # print(b)
-
-    # class LevenbergMarquardt_Old:
-    # def __init__(self):
-    #     """
-    #     Class to encapsulate all the generic logic for a Levenberg Marquardt solver.
-    #     It does not contain any information for a specific solver application.
-    #     """
-    #     self.lambda_max = 1e+6 
-    #     self.lambda_min = 1e-7
-    #     self.lambda_init = 1e-4  # Initial lambda value
-    #     self.cost_tol = 1e-3  # Cost tolerance criteria for convergence
-    #     self.delta_cost_tol = 1e-4  # Change in cost tolerance criteria for convergence
-    #     self.prev_cost = 1e+10  # Previous cost value to compare against for computing delta_cost
-    #     self.lamb = self.lambda_init # Current lambda value
-    #     self.max_iterations = 100  # Maximum number of solver iterations
-    #     self.update = True  # Use the computed delta x, so need to also recompute jacobians
-    #     self.converged = False  # Solver has converged to a solution so stop solver
-    #     self.lambda_incr_factor = 10  # Factor to increase lambda when cost increases
-    #     self.lambda_decr_factor = 0.5  # Factor to decrease lambda when cost decreases
-
-    #     def set_cost(self, cost):
-    #     delta_cost = cost - self.prev_cost
-
-    #     # Cost is decreasing
-    #     if delta_cost < 0:
-    #         # Use the computed delta x value and decrease lambda to converge faster
-    #         self.lamb = max(self.lambda_min, self.lamb * self.lambda_decr_factor) 
-    #         self.update = True
-
-    #         # Check stopping criteria
-    #         if ((cost < self.cost_tol) or (abs(delta_cost) < self.delta_cost_tol)):
-    #             # Solver has converged to a solution, so stop solver
-    #             self.converged = True
-    #             self.update = False
-
-    #     # Cost is inreasing
-    #     else:
-    #         # Don't accept current update,
-    #         # and increase lambda to prevent the overshoot that is increaing cost
-    #         self.lamb = min(self.lambda_max, self.lamb * self.lambda_incr_factor)
-    #         self.update = False
-
-    #     # Only if the new update is accepted, save the current cost as the previous cost for next iteration.
-    #     # We don't want to store the previous cost for bad updates.
-    #     if self.update:
-    #         self.prev_cost = cost
-
-    # def get_lambda(self):
-    #     return self.lamb
-
-    # def get_max_iterations(self):
-    #     return self.max_iterations
-
-    # def last_update_was_accepted(self):
-    #     return self.update
-
-    # def cost_met_stop_criteria(self):
-    #     return self.converged

@@ -33,7 +33,7 @@ class System:
 
     def run(self):
         """
-        Run the main system.  This includes performing Extended Kalman Filter (EKF).  
+        Run the main system.  
         EKF is used as the front end to build a factor graph for the Graph SLAM backend. 
         Graph SLAM solves the graph to provide optimized poses of the robot.
         """
@@ -219,23 +219,4 @@ if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     os.chdir("Data/LegoRobot")
     system_test( debug=True, test_data=False)
-
-##############################################
-#   DEPRICATED
-##############################################
-    # config_json = """
-    # {
-    #     "ticks_to_mm": 0.349,
-    #     "cylinder_offset": 90.0,
-    #     "depth_jump": 100.0,
-    #     "minimum_valid_distance": 20.0,
-    #     "max_cylinder_distance": 300.0,
-    #     "robot_width": 155.0,
-    #     "scanner_displacement": 30.0,
-    #     "control_motion_factor": 0.35,
-    #     "control_turn_factor": 0.6,
-    #     "measurement_distance_stddev": 200.0,
-    #     "measurement_angle_stddev": 0.2617993877991494
-    # }
-    # """
 

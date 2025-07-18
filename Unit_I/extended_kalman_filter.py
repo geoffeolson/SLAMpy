@@ -15,7 +15,7 @@ class EKF:
 
     def __init__(self):
 
-        # Some constants.
+        # Constants.
         self.initial_state = np.zeros((3,))
         self.initial_covariance = np.diag([100**2, 100**2, (10 * pi / 180)**2])
         self.ticks_to_mm = 0.349
